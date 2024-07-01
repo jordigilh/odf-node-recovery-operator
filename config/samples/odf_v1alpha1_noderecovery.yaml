@@ -1,0 +1,12 @@
+apiVersion: odf.openshift.io/v1alpha1
+kind: NodeRecovery
+metadata:
+  labels:
+    app.kubernetes.io/name: noderecovery
+    app.kubernetes.io/instance: noderecovery-sample
+    app.kubernetes.io/part-of: odf-node-recovery-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: odf-node-recovery-operator
+  name: noderecovery-sample
+spec:
+  # TODO(user): Add fields here

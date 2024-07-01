@@ -1,0 +1,31 @@
+# permissions for end users to edit noderecoveries.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: noderecovery-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: odf-node-recovery-operator
+    app.kubernetes.io/part-of: odf-node-recovery-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: noderecovery-editor-role
+rules:
+- apiGroups:
+  - odf.openshift.io
+  resources:
+  - noderecoveries
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - odf.openshift.io
+  resources:
+  - noderecoveries/status
+  verbs:
+  - get
