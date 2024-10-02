@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -25,22 +26,82 @@ import (
 
 // NodeRecoverySpec defines the desired state of NodeRecovery
 type NodeRecoverySpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of NodeRecovery. Edit noderecovery_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	//empty by design.
 }
+
+type RecoveryConditionType string
+
+var (
+	EnableCephToolsPod           RecoveryConditionType = "EnableCephToolsPod"
+	WaitForCephToolsPodRunning   RecoveryConditionType = "WaitForCephToolsPodRunning"
+	WaitForOSDPodsStabilize      RecoveryConditionType = "WaitForOSDPodsStabilize"
+	LabelNodesWithPendingPods    RecoveryConditionType = "LabelNodesWithPendingPods"
+	ManageCrashLoopBackOffPods   RecoveryConditionType = "ManageCrashLoopBackOffPods"
+	RestartStorageOperator       RecoveryConditionType = "RestartStorageOperator"
+	DeleteFailedPodsNodeAffinity RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
+	StorageClusterFitnessCheck   RecoveryConditionType = "StorageClusterFitnessCheck"
+	DisableCephTools             RecoveryConditionType = "DisableCephTools"
+
+	RunningPhase   RecoveryPhase = "Running"
+	FailedPhase    RecoveryPhase = "Failed"
+	CompletedPhase RecoveryPhase = "Completed"
+)
+
+// PodCondition contains details for the current condition of this pod.
+type RecoveryCondition struct {
+	// Type is the type of the condition.
+	Type RecoveryConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=conditionType"`
+	// Status is the status of the condition.
+	// Can be True, False, Unknown.
+	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
+	// Last time we probed the condition.
+	LastProbeTime metav1.Time `json:"lastProbeTime" protobuf:"bytes,3,opt,name=lastProbeTime"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime" protobuf:"bytes,4,opt,name=lastTransitionTime"`
+	// Unique, one-word, CamelCase reason for the condition's last transition.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	// Human-readable message indicating details about last transition.
+	// +optional
+	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+}
+
+type RecoveryPhase string
 
 // NodeRecoveryStatus defines the observed state of NodeRecovery
 type NodeRecoveryStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Phase RecoveryPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=RecoveryPhase"`
+	// Current conditions state of CR.
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []RecoveryCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
+
+	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
+
+	// Represents time when the job was completed. It is not guaranteed to
+	// be set in happens-before order across separate operations.
+	// It is represented in RFC3339 form and is in UTC.
+	// The completion time is set when the reconciliation finishes successfully, and only then.
+	// The value cannot be updated or removed. The value indicates the same or
+	// later point in time as the startTime field.
+	// +optional
+	CompletionTime *metav1.Time `json:"completionTime,omitempty" protobuf:"bytes,3,opt,name=completionTime"`
+
+	//PendingPods captures whether there were OSD pods in pending phase when reconciling the CR. This value is used by the reconciler along with `CrashLoopBackOffPods` to determine
+	// if the reconciliation requires a restart of the ODF operator.
+	PendingPods bool `json:"pendingPods,omitempty"`
+	//CrashLoopBackOffPods captures whether there were OSD pods in CrashLoopBackOff when reconciling the CR. This value is used by the reconciler along with the `PendingPods` to determine
+	// if the reconciliation requires a restart the ODF operator.
+	CrashLoopBackOffPods bool `json:"crashLoopBackOffPods,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // NodeRecovery is the Schema for the noderecoveries API
 type NodeRecovery struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -50,8 +111,7 @@ type NodeRecovery struct {
 	Status NodeRecoveryStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-
+// +kubebuilder:object:root=true
 // NodeRecoveryList contains a list of NodeRecovery
 type NodeRecoveryList struct {
 	metav1.TypeMeta `json:",inline"`
