@@ -47,13 +47,16 @@ func (r *remoteExecutor) Run(podName, namespaceName string, cmd []string) (strin
 			TTY:     true,
 		}, scheme.ParameterCodec)
 	exec, err := remotecommand.NewSPDYExecutor(r.Config, "POST", request.URL())
+	if err != nil {
+		return "", "", err
+	}
 	ctx := context.Background()
 	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdout: buf,
 		Stderr: errBuf,
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("Failed executing command %s on %v/%v", cmd, namespaceName, podName)
+		return "", "", fmt.Errorf("failed executing command %s on %v/%v", cmd, namespaceName, podName)
 	}
 
 	return buf.String(), errBuf.String(), nil

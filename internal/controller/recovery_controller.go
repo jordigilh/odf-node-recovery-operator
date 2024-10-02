@@ -33,7 +33,6 @@ import (
 	localv1 "github.com/openshift/local-storage-operator/pkg/common"
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	"github.com/red-hat-storage/ocs-operator/controllers/defaults"
-	ocsutil "github.com/red-hat-storage/ocs-operator/controllers/util"
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -319,40 +318,11 @@ func (r *NodeRecovery) hasPodsInCreatingOrInitializingState() (error, error) {
 		for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
 			if status.State.Waiting != nil &&
 				((status.State.Waiting.Reason == kubelet.ContainerCreating) || (status.State.Waiting.Reason == kubelet.PodInitializing)) {
-				errs = errors.Join(errs, fmt.Errorf("Pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
+				errs = errors.Join(errs, fmt.Errorf("pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
 			}
 		}
 	}
 	return errs, nil
-}
-
-// isStorageClusterReady
-//   - name: Get storagecluster status phase
-//     shell: "oc get storagecluster -n openshift-storage -o jsonpath='{.items[0].status.phase}'"
-//     register: result
-//     until: 'result.stdout == "Ready"'
-//     retries: 120
-//     delay: 10
-func (r *NodeRecovery) isStorageClusterReady() (bool, error) {
-	status, err := r.getStorageClusterStatus()
-	if err != nil {
-		return false, err
-	}
-	return status.Phase == ocsutil.PhaseReady, nil
-}
-
-func (r *NodeRecovery) getStorageClusterStatus() (*ocsoperatorv1.StorageClusterStatus, error) {
-	ctx := r.ctx
-	l := &ocsoperatorv1.StorageClusterList{}
-
-	err := r.List(ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE})
-	if err != nil {
-		return nil, err
-	}
-	if len(l.Items) == 0 {
-		return nil, fmt.Errorf("No storagecluster instance found in %s", ODF_NAMESPACE)
-	}
-	return &l.Items[0].Status, nil
 }
 
 func (r *NodeRecovery) getRunningCephToolsPod() (*v1.Pod, error) {
@@ -368,7 +338,7 @@ func (r *NodeRecovery) getRunningCephToolsPod() (*v1.Pod, error) {
 		return nil, err
 	}
 	if len(l.Items) == 0 {
-		return nil, fmt.Errorf("No pods found with label %v", selectorMap)
+		return nil, fmt.Errorf("no pods found with label %v", selectorMap)
 	}
 	return &l.Items[0], nil
 }
@@ -396,7 +366,7 @@ func (r *NodeRecovery) isCephToolsEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return o.Spec.EnableCephTools == true, nil
+	return o.Spec.EnableCephTools, nil
 }
 
 // setEnableCephToolsValue configures the ocsinitialization instance in the cluster to enable or disable the deployment of the ceph tools pod
@@ -444,14 +414,6 @@ func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 		return nil, err
 	}
 	return l, nil
-}
-
-func (r *NodeRecovery) getStorageClusterPhase() (string, error) {
-	status, err := r.getStorageClusterStatus()
-	if err != nil {
-		return "", err
-	}
-	return status.Phase, nil
 }
 
 // STORAGE CLUSTER FITNESS CHECK
@@ -520,7 +482,7 @@ func (r *NodeRecovery) getCephHealthStatus() (string, error) {
 		return "", err
 	}
 	if len(stderr) > 0 {
-		return "", fmt.Errorf("Error while executing remote shell to retrieve the ceph health status: %s", stderr)
+		return "", fmt.Errorf("error while executing remote shell to retrieve the ceph health status: %s", stderr)
 	}
 	return stdout, nil
 }
@@ -624,7 +586,7 @@ func (r *NodeRecovery) getNodeDeviceNameFromPV(pod *v1.Pod) (*nodeDevice, error)
 		if dn, ok := pv.Annotations[localv1.PVDeviceNameLabel]; ok {
 			return &nodeDevice{nodeName: pvc.Labels[v1.LabelHostname], deviceName: dn}, nil
 		}
-		return nil, fmt.Errorf("Annotation %s not found in PV %s", localv1.PVDeviceNameLabel, pv.Name)
+		return nil, fmt.Errorf("annotation %s not found in PV %s", localv1.PVDeviceNameLabel, pv.Name)
 	}
 	return nil, nil
 }
