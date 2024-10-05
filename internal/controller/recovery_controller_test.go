@@ -20,18 +20,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 )
 
-type fakeRemoteExecutor struct {
-}
-
-func newFakeRemoteExecutor() *fakeRemoteExecutor {
-	return &fakeRemoteExecutor{}
-}
-
-func (f *fakeRemoteExecutor) Run(podName, namespaceName string, cmd []string) (string, error) {
-
-	return "", nil
-}
-
 var _ = Describe("Pod Controller", func() {
 	Context("When reconciling a resource", func() {
 		It("should successfully reconcile the resource", func() {

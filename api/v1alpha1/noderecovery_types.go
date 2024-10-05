@@ -30,6 +30,7 @@ type NodeRecoverySpec struct {
 }
 
 type RecoveryConditionType string
+type RecoveryConditionReason string
 
 var (
 	EnableCephToolsPod           RecoveryConditionType = "EnableCephToolsPod"
@@ -37,6 +38,7 @@ var (
 	WaitForOSDPodsStabilize      RecoveryConditionType = "WaitForOSDPodsStabilize"
 	LabelNodesWithPendingPods    RecoveryConditionType = "LabelNodesWithPendingPods"
 	ManageCrashLoopBackOffPods   RecoveryConditionType = "ManageCrashLoopBackOffPods"
+	CleanupOSDRemovalJob         RecoveryConditionType = "CleanupOSDRemovalJob"
 	RestartStorageOperator       RecoveryConditionType = "RestartStorageOperator"
 	DeleteFailedPodsNodeAffinity RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
 	StorageClusterFitnessCheck   RecoveryConditionType = "StorageClusterFitnessCheck"
@@ -45,6 +47,22 @@ var (
 	RunningPhase   RecoveryPhase = "Running"
 	FailedPhase    RecoveryPhase = "Failed"
 	CompletedPhase RecoveryPhase = "Completed"
+
+	FailedCheckCephToolsPod              RecoveryConditionReason = "FailedCheckCephToolsPod"
+	FailedRetrieveCephToolPod            RecoveryConditionReason = "FailedRetrieveCephToolPod"
+	FailedEnableCephToolsPod             RecoveryConditionReason = "FailedEnableCephToolsPod"
+	FailedDisableCephToolsPod            RecoveryConditionReason = "FailedDisableCephToolsPod"
+	PodNotInRunningPhase                 RecoveryConditionReason = "PodNotInRunningPhase"
+	FailedRetrievePodsPhase              RecoveryConditionReason = "FailedRetrievePodsPhase"
+	WaitingForPodsToInitialize           RecoveryConditionReason = "WaitingForPodsToInitialize"
+	FailedRetrievePendingPods            RecoveryConditionReason = "FailedRetrievePendingPods"
+	FailedLabelNodes                     RecoveryConditionReason = "FailedLabelNodes"
+	FailedRetrieveCrashLoopBackOffPods   RecoveryConditionReason = "FailedRetrieveCrashLoopBackOffPods"
+	FailedHandleCrashLoopBackOffPods     RecoveryConditionReason = "FailedHandleCrashLoopBackOffPods"
+	FailedRestartODFOperator             RecoveryConditionReason = "FailedRestartODFOperator"
+	FailedDeleteFailedPodsNodeAffinity   RecoveryConditionReason = "FailedDeleteFailedPodsNodeAffinity"
+	FailedArchiveCephDaemonCrashMessages RecoveryConditionReason = "FailedArchiveCephDaemonCrashMessages"
+	FailedRetrieveCephHealthStatus       RecoveryConditionReason = "FailedRetrieveCephHealthStatus"
 )
 
 // PodCondition contains details for the current condition of this pod.
@@ -60,7 +78,7 @@ type RecoveryCondition struct {
 	LastTransitionTime metav1.Time `json:"lastTransitionTime" protobuf:"bytes,4,opt,name=lastTransitionTime"`
 	// Unique, one-word, CamelCase reason for the condition's last transition.
 	// +optional
-	Reason string `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
+	Reason RecoveryConditionReason `json:"reason,omitempty" protobuf:"bytes,5,opt,name=reason"`
 	// Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`

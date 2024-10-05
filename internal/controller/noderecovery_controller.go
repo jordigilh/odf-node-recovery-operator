@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
+	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	"k8s.io/client-go/tools/record"
 )
 
@@ -38,8 +39,9 @@ import (
 type NodeRecoveryReconciler struct {
 	client.Client
 	*rest.Config
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme    *runtime.Scheme
+	Recorder  record.EventRecorder
+	CmdRunner pod.RemoteCommandExecutor
 }
 
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries,verbs=get;list;watch;create;update;patch;delete
@@ -79,14 +81,19 @@ func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if apierrors.IsNotFound(err) || !instance.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
-	recoverer, err := newNodeRecoveryReconciler(ctx, r.Config, r.Scheme, r.Recorder, newRemoteExecutor(r.Config))
-	if err != nil {
-		return ctrl.Result{}, err
+	if instance.Status.Phase == odfv1alpha1.FailedPhase ||
+		instance.Status.Phase == odfv1alpha1.CompletedPhase {
+		log.V(5).Info("Attempting to process CR %s which is in %s phase. Ignoring...", instance.Name, string(instance.Status.Phase))
+		return ctrl.Result{}, nil
 	}
 	if instance.Status.StartTime.IsZero() {
 		instance.Status.StartTime = &metav1.Time{Time: time.Now()}
 		instance.Status.Phase = odfv1alpha1.RunningPhase
 		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, Status: v1.ConditionTrue, LastTransitionTime: metav1.Now()})
+	}
+	recoverer, err := newNodeRecoveryReconciler(ctx, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 	result, err := recoverer.Reconcile(instance)
 	serr := r.Status().Update(ctx, instance)

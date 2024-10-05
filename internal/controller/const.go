@@ -5,7 +5,6 @@ const (
 	podStateReasonCrashLoopBackOff = "CrashLoopBackOff"
 	FAILED_OSD_IDS                 = "FAILED_OSD_IDS"
 	HEALTH_OK                      = "HEALTH_OK"
-	IMAGE_PULLSPEC                 = "registry.redhat.io/rhel8/support-tools"
 )
 
 type RecoveryReason string

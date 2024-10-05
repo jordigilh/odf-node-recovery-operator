@@ -746,7 +746,6 @@ github.com/prometheus/procfs/internal/util
 ## explicit; go 1.19
 github.com/red-hat-storage/ocs-operator/api/v1
 github.com/red-hat-storage/ocs-operator/controllers/defaults
-github.com/red-hat-storage/ocs-operator/controllers/util
 # github.com/rook/rook v1.15.2
 ## explicit; go 1.22.0
 github.com/rook/rook/cmd/rook/rook
@@ -946,7 +945,7 @@ go.uber.org/zap/internal/pool
 go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/zapcore
 go.uber.org/zap/zapgrpc
-# golang.org/x/crypto v0.26.0
+# golang.org/x/crypto v0.27.0
 ## explicit; go 1.20
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
@@ -963,10 +962,10 @@ golang.org/x/crypto/salsa20/salsa
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
 golang.org/x/exp/slices
-# golang.org/x/mod v0.20.0
-## explicit; go 1.18
+# golang.org/x/mod v0.21.0
+## explicit; go 1.22.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.28.0
+# golang.org/x/net v0.29.0
 ## explicit; go 1.18
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -994,17 +993,17 @@ golang.org/x/oauth2/internal
 ## explicit; go 1.18
 golang.org/x/sync/errgroup
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.24.0
+# golang.org/x/sys v0.25.0
 ## explicit; go 1.18
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.23.0
+# golang.org/x/term v0.24.0
 ## explicit; go 1.18
 golang.org/x/term
-# golang.org/x/text v0.17.0
+# golang.org/x/text v0.19.0
 ## explicit; go 1.18
 golang.org/x/text/cases
 golang.org/x/text/encoding
@@ -1039,8 +1038,8 @@ golang.org/x/text/width
 # golang.org/x/time v0.6.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# golang.org/x/tools v0.24.0
-## explicit; go 1.19
+# golang.org/x/tools v0.25.0
+## explicit; go 1.22.0
 golang.org/x/tools/cover
 golang.org/x/tools/go/ast/inspector
 golang.org/x/tools/go/gcexportdata
@@ -1853,6 +1852,8 @@ k8s.io/cloud-provider/options
 k8s.io/cloud-provider/volume
 k8s.io/cloud-provider/volume/errors
 k8s.io/cloud-provider/volume/helpers
+# k8s.io/code-generator v0.31.1
+## explicit; go 1.22.0
 # k8s.io/component-base v0.31.1
 ## explicit; go 1.22.0
 k8s.io/component-base/cli/flag
@@ -1920,6 +1921,8 @@ k8s.io/csi-translation-lib/plugins
 k8s.io/dynamic-resource-allocation/cel
 k8s.io/dynamic-resource-allocation/resourceclaim
 k8s.io/dynamic-resource-allocation/structured
+# k8s.io/gengo/v2 v2.0.0-20240826214909-a7b603a56eb7
+## explicit; go 1.20
 # k8s.io/klog/v2 v2.130.1
 ## explicit; go 1.18
 k8s.io/klog/v2
@@ -1937,7 +1940,7 @@ k8s.io/kms/apis/v1beta1
 k8s.io/kms/apis/v2
 k8s.io/kms/pkg/service
 k8s.io/kms/pkg/util
-# k8s.io/kube-openapi v0.0.0-20240808142205-8e686545bdb8
+# k8s.io/kube-openapi v0.0.0-20240903163716-9e1beecbcb38
 ## explicit; go 1.20
 k8s.io/kube-openapi/pkg/builder
 k8s.io/kube-openapi/pkg/builder3

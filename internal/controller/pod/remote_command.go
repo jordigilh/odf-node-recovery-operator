@@ -1,4 +1,4 @@
-package controller
+package pod
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 )
 
-type remoteCommandExecutor interface {
+type RemoteCommandExecutor interface {
 	Run(podName, namespaceName string, cmd []string) (string, string, error)
 }
 
@@ -20,7 +20,7 @@ type remoteExecutor struct {
 	*rest.Config
 }
 
-func newRemoteExecutor(config *rest.Config) remoteCommandExecutor {
+func NewRemoteExecutor(config *rest.Config) RemoteCommandExecutor {
 
 	return &remoteExecutor{Config: config}
 }

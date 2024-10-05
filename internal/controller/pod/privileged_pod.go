@@ -1,4 +1,4 @@
-package controller
+package pod
 
 import (
 	"context"
@@ -12,16 +12,14 @@ import (
 	policyapi "k8s.io/pod-security-admission/api"
 )
 
+const IMAGE_PULLSPEC = "registry.redhat.io/rhel8/support-tools"
+
 type Runner struct {
-	kcli kubernetes.Clientset
+	kcli *kubernetes.Clientset
 }
 
-func NewRunner(config *restclient.Config) (*Runner, error) {
-	kcli, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, nil
-	}
-	return &Runner{kcli: *kcli}, nil
+func NewRunner(config *restclient.Config) *Runner {
+	return &Runner{kcli: kubernetes.NewForConfigOrDie(config)}
 }
 
 // Initialize creates a temporal namespace with privileged labels and deploys a pod with the node's filesyste mounted in /host

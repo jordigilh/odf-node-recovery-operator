@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	v1 "k8s.io/api/networking/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,6 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
+	templatev1 "github.com/openshift/api/template/v1"
+	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -63,7 +68,7 @@ var _ = BeforeSuite(func() {
 		// Note that you must have the required binaries setup under the bin directory to perform
 		// the tests directly. When we run make test it will be setup and used automatically.
 		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
-			fmt.Sprintf("1.28.3-%s-%s", runtime.GOOS, runtime.GOARCH)),
+			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 	}
 
 	var err error
@@ -72,8 +77,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = odfv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(v1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(appsv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(batchv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(templatev1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(ocsoperatorv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+	Expect(odfv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme
 

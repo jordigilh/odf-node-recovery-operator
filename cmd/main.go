@@ -37,6 +37,7 @@ import (
 
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller"
+	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -125,10 +126,11 @@ func main() {
 
 	config := ctrl.GetConfigOrDie()
 	if err = (&controller.NodeRecoveryReconciler{
-		Config:   config,
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("odf-node-recovery-controller"),
+		Config:    config,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Recorder:  mgr.GetEventRecorderFor("odf-node-recovery-controller"),
+		CmdRunner: pod.NewRemoteExecutor(config),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeRecovery")
 		os.Exit(1)
