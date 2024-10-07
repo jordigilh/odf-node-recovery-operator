@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
+	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	templatev1 "github.com/openshift/api/template/v1"
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"

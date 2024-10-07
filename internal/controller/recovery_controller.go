@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
+	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	octemplateapi "github.com/openshift/api/template"
 	templatev1client "github.com/openshift/client-go/template/clientset/versioned/typed/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"

@@ -11,8 +11,10 @@ spec:
     kind: NodeRecovery
     listKind: NodeRecoveryList
     plural: noderecoveries
+    shortNames:
+    - noderec
     singular: noderecovery
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
@@ -35,9 +37,6 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
-            type: object
-          spec:
-            description: NodeRecoverySpec defines the desired state of NodeRecovery
             type: object
           status:
             description: NodeRecoveryStatus defines the observed state of NodeRecovery

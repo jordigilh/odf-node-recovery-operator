@@ -1,8 +1,6 @@
 module github.com/jordigilh/odf-node-recovery-operator
 
-go 1.22.5
-
-toolchain go1.23.1
+go 1.22.8
 
 require (
 	github.com/onsi/ginkgo/v2 v2.20.2
@@ -57,8 +55,6 @@ require (
 	go.starlark.net v0.0.0-20231121155337-90ade8b19d09 // indirect
 	k8s.io/cli-runtime v0.30.3 // indirect
 	k8s.io/cloud-provider v0.30.3 // indirect
-	k8s.io/code-generator v0.31.1 // indirect
-	k8s.io/gengo/v2 v2.0.0-20240826214909-a7b603a56eb7 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 )
@@ -245,7 +241,7 @@ require (
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0 // indirect
 	sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20240328032358-4f81db77908f // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 	sigs.k8s.io/yaml v1.4.0 // indirect
 
 )
