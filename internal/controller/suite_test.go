@@ -22,19 +22,18 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/api/networking/v1"
-	"k8s.io/client-go/kubernetes/scheme"
+	corev1 "k8s.io/api/core/v1"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
-	templatev1 "github.com/openshift/api/template/v1"
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -77,18 +76,12 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	Expect(v1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(appsv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(batchv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(templatev1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(ocsoperatorv1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-	Expect(odfv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
-
 	//+kubebuilder:scaffold:scheme
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).NotTo(HaveOccurred())
-	Expect(k8sClient).NotTo(BeNil())
+	// scheme := createFakeScheme()
+	// k8sClient = fake.NewClientBuilder().WithScheme(scheme).Build()
+	// Expect(err).NotTo(HaveOccurred())
+	// Expect(k8sClient).NotTo(BeNil())
 
 })
 
@@ -97,3 +90,15 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func createFakeScheme() *kruntime.Scheme {
+	scheme := kruntime.NewScheme()
+
+	Expect(ocsoperatorv1.AddToScheme(scheme)).To(Succeed(), "failed to add ocsoperatorv1 scheme")
+	Expect(batchv1.AddToScheme(scheme)).To(Succeed(), "failed to add batchv1 to scheme")
+	Expect(corev1.AddToScheme(scheme)).To(Succeed(), "failed to add corev1 scheme")
+	Expect(appsv1.AddToScheme(scheme)).To(Succeed(), "failed to add appsv1 scheme")
+	Expect(v1alpha1.AddToScheme(scheme)).To(Succeed(), "failed to add appsv1 scheme")
+
+	return scheme
+}
