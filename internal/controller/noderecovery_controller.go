@@ -91,12 +91,12 @@ func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		instance.Status.Phase = odfv1alpha1.RunningPhase
 		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, Status: v1.ConditionTrue, LastTransitionTime: metav1.Now()})
 	}
-	recoverer, err := newNodeRecoveryReconciler(ctx, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
+	recoverer, err := newNodeRecoveryReconciler(ctx, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	result, err := recoverer.Reconcile(instance)
-	serr := r.Status().Update(ctx, instance)
+	serr := r.Update(ctx, instance)
 	return result, errors.Join(err, serr)
 }
 

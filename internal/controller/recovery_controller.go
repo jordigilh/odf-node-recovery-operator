@@ -66,11 +66,8 @@ type NodeRecovery struct {
 	log       logr.Logger
 }
 
-func newNodeRecoveryReconciler(ctx context.Context, restConfig *rest.Config, scheme *runtime.Scheme, recorder record.EventRecorder, cmdRunner pod.RemoteCommandExecutor) (*NodeRecovery, error) {
-	client, err := client.New(restConfig, client.Options{})
-	if err != nil {
-		return nil, err
-	}
+func newNodeRecoveryReconciler(ctx context.Context, client client.Client, restConfig *rest.Config, scheme *runtime.Scheme, recorder record.EventRecorder, cmdRunner pod.RemoteCommandExecutor) (*NodeRecovery, error) {
+
 	return &NodeRecovery{
 		Client:    client,
 		Config:    restConfig,
