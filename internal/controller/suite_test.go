@@ -23,9 +23,11 @@ import (
 	"testing"
 
 	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
+	"github.com/jordigilh/odf-node-recovery-operator/pkg/client/clientset/versioned/scheme"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	templatev1 "github.com/openshift/api/template/v1"
 	corev1 "k8s.io/api/core/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -92,13 +94,15 @@ var _ = AfterSuite(func() {
 })
 
 func createFakeScheme() *kruntime.Scheme {
-	scheme := kruntime.NewScheme()
-
-	Expect(ocsoperatorv1.AddToScheme(scheme)).To(Succeed(), "failed to add ocsoperatorv1 scheme")
-	Expect(batchv1.AddToScheme(scheme)).To(Succeed(), "failed to add batchv1 to scheme")
-	Expect(corev1.AddToScheme(scheme)).To(Succeed(), "failed to add corev1 scheme")
-	Expect(appsv1.AddToScheme(scheme)).To(Succeed(), "failed to add appsv1 scheme")
-	Expect(v1alpha1.AddToScheme(scheme)).To(Succeed(), "failed to add appsv1 scheme")
-
-	return scheme
+	s := scheme.Scheme
+	builder := append(kruntime.SchemeBuilder{},
+		ocsoperatorv1.AddToScheme,
+		batchv1.AddToScheme,
+		corev1.AddToScheme,
+		appsv1.AddToScheme,
+		v1alpha1.AddToScheme,
+		templatev1.Install,
+	)
+	Expect(builder.AddToScheme(s)).To(Succeed())
+	return s
 }

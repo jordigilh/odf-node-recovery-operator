@@ -28,7 +28,7 @@ import (
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	octemplateapi "github.com/openshift/api/template"
-	templatev1client "github.com/openshift/client-go/template/clientset/versioned/typed/template/v1"
+	templatev1 "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
 	localv1 "github.com/openshift/local-storage-operator/pkg/common"
@@ -40,6 +40,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -411,7 +412,8 @@ func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = r.List(r.ctx, l, &client.ListOptions{LabelSelector: selector, FieldSelector: fields.ParseSelectorOrDie(`status.phase=="` + string(v1.PodPending) + `"`)})
+	field := fields.ParseSelectorOrDie(fmt.Sprintf("status.phase=%s", v1.PodPending))
+	err = r.List(r.ctx, l, &client.ListOptions{LabelSelector: selector, FieldSelector: field})
 	if err != nil {
 		return nil, err
 	}
@@ -503,6 +505,9 @@ func (r *NodeRecovery) labelNodesWithPodsInPendingState(pods *v1.PodList) error 
 		if err != nil {
 			errs = errors.Join(errs, err)
 			continue
+		}
+		if n.Labels == nil {
+			n.Labels = make(map[string]string)
 		}
 		n.Labels[defaults.NodeAffinityKey] = ""
 		err = r.Update(r.ctx, n, &client.UpdateOptions{})
@@ -732,25 +737,41 @@ func extractOSDIds(pods []v1.Pod) []string {
 
 func (r *NodeRecovery) processOCSOSDRemovalTemplate(crashingPods []v1.Pod) error {
 	ids := extractOSDIds(crashingPods)
-
-	templateClient, err := templatev1client.NewForConfig(r.Config)
+	t := &templatev1.Template{}
+	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: OCS_OSD_REMOVAL}, t)
 	if err != nil {
 		return err
 	}
-	template, err := templateClient.Templates(ODF_NAMESPACE).Get(r.ctx, "ocs-osd-removal", metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	param := templateprocessing.GetParameterByName(template, FAILED_OSD_IDS)
+	param := templateprocessing.GetParameterByName(t, FAILED_OSD_IDS)
 	param.Value = strings.Join(ids, ",")
 	processor := templateprocessing.NewProcessor(map[string]generator.Generator{
 		"expression": generator.NewExpressionValueGenerator(rand.New(rand.NewSource(time.Now().UnixNano()))),
 	})
-	if errs := processor.Process(template); len(errs) > 0 {
-		return kerrors.NewInvalid(octemplateapi.Kind("Template"), template.Name, errs)
+	if errs := processor.Process(t); len(errs) > 0 {
+		return kerrors.NewInvalid(octemplateapi.Kind("Template"), t.Name, errs)
 	}
-	_, err = templateClient.Templates(ODF_NAMESPACE).Create(r.ctx, template, metav1.CreateOptions{})
-	return err
+	// attempt to convert our resulting object to external
+	for _, obj := range t.Objects {
+		objToCreate := obj.Object
+		if objToCreate == nil {
+			converted, err := runtime.Decode(unstructured.UnstructuredJSONScheme, obj.Raw)
+			if err != nil {
+				return err
+			}
+			objToCreate = converted
+		}
+		var (
+			cobj client.Object
+			ok   bool
+		)
+		if cobj, ok = objToCreate.(client.Object); !ok {
+			return fmt.Errorf("failed to cast as client.Object: %v", objToCreate)
+		}
+		if err := r.Create(r.ctx, cobj, &client.CreateOptions{}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // getOSDRemovalPodCompletionStatus

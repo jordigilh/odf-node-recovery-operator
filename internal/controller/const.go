@@ -5,6 +5,7 @@ const (
 	podStateReasonCrashLoopBackOff = "CrashLoopBackOff"
 	FAILED_OSD_IDS                 = "FAILED_OSD_IDS"
 	HEALTH_OK                      = "HEALTH_OK"
+	OCS_OSD_REMOVAL                = "ocs-osd-removal"
 )
 
 type RecoveryReason string

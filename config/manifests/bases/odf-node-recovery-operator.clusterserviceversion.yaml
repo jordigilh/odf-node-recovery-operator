@@ -5,7 +5,6 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
   name: odf-node-recovery-operator.v0.0.0
-  namespace: placeholder
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions: {}
