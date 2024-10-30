@@ -30,7 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
+
 	"k8s.io/apimachinery/pkg/api/apitesting"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -309,7 +309,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 					Name: "foo",
 				},
 			}
-			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, p1, n).WithIndex(&v1.Pod{}, "status.phase", filterByPhase).Build()
+			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, p1, n).WithIndex(&corev1.Pod{}, "status.phase", filterByPhase).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
 				Client:    k8sClient,
@@ -435,7 +435,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 					Finalizers:        []string{"foo"},
 				},
 			}
-			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, template, d, p1, p2, pv, pvc).WithIndex(&v1.Pod{}, "status.phase", filterByPhase).Build()
+			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, template, d, p1, p2, pv, pvc).WithIndex(&corev1.Pod{}, "status.phase", filterByPhase).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
 				Client:    k8sClient,
@@ -739,7 +739,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 				},
 			}
 
-			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, tools, p).WithIndex(&v1.Pod{}, "status.phase", filterByPhase).Build()
+			k8sClient = fake.NewClientBuilder().WithScheme(scheme).WithObjects(os, init, noderecovery, tools, p).WithIndex(&corev1.Pod{}, "status.phase", filterByPhase).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
 				Client:    k8sClient,
@@ -878,8 +878,8 @@ func newFakeRemoteExecutor(stdout, stderr string, err error) *fakeRemoteExecutor
 	return &fakeRemoteExecutor{stdout: stdout, stderr: stderr, err: err}
 }
 
-func (f *fakeRemoteExecutor) Run(podName, namespaceName string, cmd []string) (string, string, error) {
-	return f.stdout, f.stderr, f.err
+func (f *fakeRemoteExecutor) Run(pod *corev1.Pod, cmd []string) ([]byte, []byte, error) {
+	return []byte(f.stdout), []byte(f.stderr), f.err
 }
 
 func newNamespace(name string) *corev1.Namespace {

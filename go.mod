@@ -3,14 +3,16 @@ module github.com/jordigilh/odf-node-recovery-operator
 go 1.22.8
 
 require (
+	github.com/hashicorp/go-version v1.7.0
 	github.com/onsi/ginkgo/v2 v2.20.2
 	github.com/onsi/gomega v1.34.2
 	github.com/openshift/local-storage-operator v0.0.0-20240906102848-0008d0299d4c
 	github.com/red-hat-storage/ocs-operator v0.4.13
 	github.com/rook/rook v1.15.2
-	k8s.io/api v0.31.1
-	k8s.io/apimachinery v0.31.1
+	k8s.io/api v0.31.2
+	k8s.io/apimachinery v0.31.2
 	k8s.io/client-go v1.5.2
+	k8s.io/kubectl v0.31.1
 	k8s.io/kubernetes v1.31.1
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
@@ -28,11 +30,14 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
+	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/semver/v3 v3.2.1 // indirect
 	github.com/ceph/ceph-csi-operator/api v0.0.0-20240819112305-88e6db254d6c // indirect
 	github.com/ceph/ceph-csi/api v0.0.0-20231227104434-06f9a98b7a83 // indirect
+	github.com/chai2010/gettext-go v1.0.2 // indirect
 	github.com/containernetworking/cni v1.2.0-rc1 // indirect
 	github.com/csi-addons/kubernetes-csi-addons v0.9.1 // indirect
+	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/go-errors/errors v1.5.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.1 // indirect
 	github.com/go-test/deep v1.1.0 // indirect
@@ -44,15 +49,17 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/libopenstorage/secrets v0.0.0-20240416031220-a17cf7f72c6c // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
+	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/moby/term v0.5.0 // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/portworx/sched-ops v1.20.4-rc1.0.20220208024433-611d861089d4 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sykesm/zap-logfmt v0.0.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.starlark.net v0.0.0-20231121155337-90ade8b19d09 // indirect
-	k8s.io/cli-runtime v0.30.3 // indirect
+	k8s.io/cli-runtime v0.31.2 // indirect
 	k8s.io/cloud-provider v0.30.3 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
@@ -222,8 +229,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
 	k8s.io/apiserver v0.31.1 // indirect
-	k8s.io/component-base v0.31.1 // indirect
-	k8s.io/component-helpers v0.31.1 // indirect
+	k8s.io/component-base v0.31.2 // indirect
+	k8s.io/component-helpers v0.31.2 // indirect
 	k8s.io/controller-manager v0.31.1 // indirect
 	k8s.io/cri-api v0.31.1 // indirect
 	k8s.io/cri-client v0.0.0 // indirect

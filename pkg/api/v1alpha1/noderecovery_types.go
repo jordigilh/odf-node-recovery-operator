@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -64,9 +63,6 @@ var (
 type RecoveryCondition struct {
 	// Type is the type of the condition.
 	Type RecoveryConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=conditionType"`
-	// Status is the status of the condition.
-	// Can be True, False, Unknown.
-	Status v1.ConditionStatus `json:"status" protobuf:"bytes,2,opt,name=status,casttype=ConditionStatus"`
 	// Last time we probed the condition.
 	LastProbeTime metav1.Time `json:"lastProbeTime" protobuf:"bytes,3,opt,name=lastProbeTime"`
 	// Last time the condition transitioned from one status to another.

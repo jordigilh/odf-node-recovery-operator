@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,11 +51,18 @@ type NodeRecoveryReconciler struct {
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries/finalizers,verbs=update
 
+// OCS
+//+kubebuilder:rbac:groups=ocs.openshift.io,resources=ocsinitializations,verbs=get
 // Events
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-// Pods
-//+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;
+// +kubebuilder:printcolumn:name="Name",type=date,JSONPath=.metadata.name
+// +kubebuilder:printcolumn:name="Created At",type=string,JSONPath=.status.startTime
+// +kubebuilder:printcolumn:name="Completed At",type=string,JSONPath=.status.completionTime
+// +kubebuilder:printcolumn:name="Phase",type=date,JSONPath=.status.phase,description="Current Phase"
+// +kubebuilder:printcolumn:name="Last Condition",type=string,JSONPath=.status.conditions[:-1].type,description="Current Phase"
+
+// +operator-sdk:csv:customresourcedefinitions:displayName="ODF Node Recovery"
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -85,25 +93,35 @@ func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if instance.Status.Phase == odfv1alpha1.FailedPhase ||
 		instance.Status.Phase == odfv1alpha1.CompletedPhase {
-		log.V(5).Info("Attempting to process CR %s which is in %s phase. Ignoring...", instance.Name, string(instance.Status.Phase))
+		log.V(5).Info(fmt.Sprintf("Attempting to process CR %s which is in %s phase. Ignoring...", instance.Name, string(instance.Status.Phase)))
 		return ctrl.Result{}, nil
 	}
 	if instance.Status.StartTime.IsZero() {
 		instance.Status.StartTime = &metav1.Time{Time: time.Now()}
 		instance.Status.Phase = odfv1alpha1.RunningPhase
-		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, Status: v1.ConditionTrue, LastTransitionTime: metav1.Now()})
+		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, LastTransitionTime: metav1.Now()})
 	}
 	recoverer, err := newNodeRecoveryReconciler(ctx, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	result, err := recoverer.Reconcile(instance)
-	serr := r.Update(ctx, instance)
+	serr := r.Status().Update(ctx, instance)
 	return result, errors.Join(err, serr)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeRecoveryReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1.Pod{}, podStatusPhaseFieldSelector, func(rawObj client.Object) []string {
+		obj, ok := rawObj.(*v1.Pod)
+		if !ok {
+			return nil
+		}
+		return []string{string(obj.Status.Phase)}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&odfv1alpha1.NodeRecovery{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&odfv1alpha1.NodeRecovery{}).

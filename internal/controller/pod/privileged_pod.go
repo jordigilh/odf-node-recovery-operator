@@ -23,18 +23,18 @@ func NewRunner(config *restclient.Config) *Runner {
 }
 
 // Initialize creates a temporal namespace with privileged labels and deploys a pod with the node's filesyste mounted in /host
-func (c *Runner) Initialize(nodeName string) (string, string, func(), error) {
+func (c *Runner) Initialize(nodeName string) (*v1.Pod, func(), error) {
 	nsName, cleanup, err := c.createNamespace()
 
 	if err != nil {
-		return "", "", nil, err
+		return nil, nil, err
 	}
-	podName, err := c.deployNodeRunnerPod(nsName, nodeName)
+	pod, err := c.deployNodeRunnerPod(nsName, nodeName)
 	if err != nil {
-		return "", "", nil, err
+		return nil, nil, err
 	}
 
-	return podName, nsName, cleanup, nil
+	return pod, cleanup, nil
 }
 
 // createNamespace returns namespace name and clean up function.
@@ -73,7 +73,7 @@ func (c *Runner) createNamespace() (string, func(), error) {
 
 // deployNodeRunnerPod create a pod that schedules on the specified node.
 // The generated pod will run in the host IPC namespaces, and it will have the node's filesystem mounted at /host.
-func (c *Runner) deployNodeRunnerPod(namespaceName, nodeName string) (string, error) {
+func (c *Runner) deployNodeRunnerPod(namespaceName, nodeName string) (*v1.Pod, error) {
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("node-runner-%s", nodeName),
@@ -118,7 +118,7 @@ func (c *Runner) deployNodeRunnerPod(namespaceName, nodeName string) (string, er
 
 	p, err := c.kcli.CoreV1().Pods(namespaceName).Create(context.TODO(), p, metav1.CreateOptions{})
 	if err != nil {
-		return "", fmt.Errorf("unable to create node runner pod in namespace %s: %v", namespaceName, err)
+		return nil, fmt.Errorf("unable to create node runner pod in namespace %s: %v", namespaceName, err)
 	}
-	return p.Name, nil
+	return p, nil
 }

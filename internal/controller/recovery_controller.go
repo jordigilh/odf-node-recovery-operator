@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -25,8 +26,10 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	version "github.com/hashicorp/go-version"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
+	configv1 "github.com/openshift/api/config/v1"
 	octemplateapi "github.com/openshift/api/template"
 	templatev1 "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
@@ -35,13 +38,13 @@ import (
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	"github.com/red-hat-storage/ocs-operator/controllers/defaults"
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
+
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
@@ -114,7 +117,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				return ctrl.Result{}, err
 			}
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.WaitForCephToolsPodRunning)
+		transitionNextCondition(instance, odfv1alpha1.WaitForCephToolsPodRunning)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	case odfv1alpha1.WaitForCephToolsPodRunning:
 		phase, err := r.getCephToolsPodPhase()
@@ -128,7 +131,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			latestCondition.Message = "Ceph Tool pod is not in Running phase"
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.WaitForOSDPodsStabilize)
+		transitionNextCondition(instance, odfv1alpha1.WaitForOSDPodsStabilize)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.WaitForOSDPodsStabilize:
 		//  WAIT FOR PODS TO STABILIZE
@@ -145,7 +148,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			r.log.V(5).Info("Requeuing due to pods not yet initialized: %v", podErr)
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.LabelNodesWithPendingPods)
+		transitionNextCondition(instance, odfv1alpha1.LabelNodesWithPendingPods)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.LabelNodesWithPendingPods:
 		pendingOSDPods, err := r.getPodsInPendingPhase()
@@ -164,7 +167,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				return ctrl.Result{}, err
 			}
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.ManageCrashLoopBackOffPods)
+		transitionNextCondition(instance, odfv1alpha1.ManageCrashLoopBackOffPods)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.ManageCrashLoopBackOffPods:
 		// INITCRASHLOOKBACKOFF STATE PODS
@@ -182,9 +185,11 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				latestCondition.Message = err.Error()
 				return c, err
 			}
+			transitionNextCondition(instance, odfv1alpha1.CleanupOSDRemovalJob)
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.CleanupOSDRemovalJob)
-		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
+		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.CleanupOSDRemovalJob:
 		pod, err := r.getOSDRemovalPodJobCompletionStatus()
 		if err != nil {
@@ -197,7 +202,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.RestartStorageOperator)
+		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.RestartStorageOperator:
 		if instance.Status.PendingPods || instance.Status.CrashLoopBackOffPods {
@@ -208,7 +213,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				return ctrl.Result{}, err
 			}
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.DeleteFailedPodsNodeAffinity)
+		transitionNextCondition(instance, odfv1alpha1.DeleteFailedPodsNodeAffinity)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.DeleteFailedPodsNodeAffinity:
 		err := r.deleteFailedPodsWithReasonNodeAffinity()
@@ -223,7 +228,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.StorageClusterFitnessCheck)
+		transitionNextCondition(instance, odfv1alpha1.StorageClusterFitnessCheck)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.StorageClusterFitnessCheck:
 		status, err := r.getCephHealthStatus()
@@ -235,7 +240,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		if status != HEALTH_OK {
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
-		transitionNextCondition(instance, latestCondition, odfv1alpha1.DisableCephTools)
+		transitionNextCondition(instance, odfv1alpha1.DisableCephTools)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.DisableCephTools:
 		err := r.disableCephTools()
@@ -360,32 +365,73 @@ func (r *NodeRecovery) archiveCephDaemonCrashMessages() error {
 	if err != nil {
 		return err
 	}
-	_, _, err = r.cmdRunner.Run(pod.Name, pod.Namespace, cmd)
+	_, _, err = r.cmdRunner.Run(pod, cmd)
 	return err
 }
 
 func (r *NodeRecovery) isCephToolsEnabled() (bool, error) {
-	o, err := r.getOSCInitialization()
+	v, err := r.getOCPVersion()
 	if err != nil {
 		return false, err
 	}
-	return o.Spec.EnableCephTools, nil
+	if v.LessThan(ocp4_15) {
+		o, err := r.getOSCInitialization()
+		if err != nil {
+			return false, err
+		}
+		return o.Spec.EnableCephTools, nil
+	}
+	sc, err := r.getStorageCluster()
+	if err != nil {
+		return false, err
+	}
+	return sc.Spec.EnableCephTools, nil
+}
+
+func (r *NodeRecovery) getStorageCluster() (*ocsoperatorv1.StorageCluster, error) {
+	sc := &ocsoperatorv1.StorageCluster{}
+	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocs-storagecluster"}, sc, &client.GetOptions{})
+	return sc, err
 }
 
 // setEnableCephToolsValue configures the ocsinitialization instance in the cluster to enable or disable the deployment of the ceph tools pod
 func (r *NodeRecovery) setEnableCephToolsValue(value bool) error {
-	o, err := r.getOSCInitialization()
+	v, err := r.getOCPVersion()
 	if err != nil {
 		return err
 	}
-	o.Spec.EnableCephTools = value
-	return r.Update(r.ctx, o, &client.UpdateOptions{})
+	if v.LessThan(ocp4_15) {
+		o, err := r.getOSCInitialization()
+		if err != nil {
+			return err
+		}
+		o.Spec.EnableCephTools = value
+		return r.Update(r.ctx, o, &client.UpdateOptions{})
+	}
+	sc, err := r.getStorageCluster()
+	if err != nil {
+		return err
+	}
+	sc.Spec.EnableCephTools = value
+	return r.Update(r.ctx, sc, &client.UpdateOptions{})
 }
 
+func (r *NodeRecovery) getOCPVersion() (*version.Version, error) {
+	c := &configv1.ClusterVersion{}
+	err := r.Get(r.ctx, types.NamespacedName{Name: "version"}, c)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range c.Status.History {
+		if i.State == configv1.CompletedUpdate {
+			return version.NewVersion(i.Version)
+		}
+	}
+	return nil, fmt.Errorf("no valid version found in clusterversion object")
+}
 func (r NodeRecovery) getOSCInitialization() (*ocsoperatorv1.OCSInitialization, error) {
-	ctx := r.ctx
 	o := &ocsoperatorv1.OCSInitialization{}
-	err := r.Get(ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocsinit"}, o, &client.GetOptions{})
+	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocsinit"}, o, &client.GetOptions{})
 	return o, err
 }
 
@@ -407,13 +453,7 @@ func (r *NodeRecovery) getCephToolsPodPhase() (v1.PodPhase, error) {
 
 func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 	l := &v1.PodList{}
-	selectorMap := map[string]string{"app": "rook-ceph-osd"}
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
-	if err != nil {
-		return nil, err
-	}
-	field := fields.ParseSelectorOrDie(fmt.Sprintf("status.phase=%s", v1.PodPending))
-	err = r.List(r.ctx, l, &client.ListOptions{LabelSelector: selector, FieldSelector: field})
+	err := r.List(r.ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE}, &client.MatchingFields{podStatusPhaseFieldSelector: string(v1.PodPending)}, &client.MatchingLabels{"app": "rook-ceph-osd"})
 	if err != nil {
 		return nil, err
 	}
@@ -432,7 +472,7 @@ func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 func (r *NodeRecovery) getPodsInFailedPhaseWithReasonNodeAffinity() ([]v1.Pod, error) {
 	l := &v1.PodList{}
 	failedPods := []v1.Pod{}
-	err := r.List(r.ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE, FieldSelector: fields.ParseSelectorOrDie(`status.phase=="` + string(v1.PodFailed) + `"`)})
+	err := r.List(r.ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE}, &client.MatchingFields{podStatusPhaseFieldSelector: string(v1.PodFailed)})
 	if err != nil {
 		return nil, err
 	}
@@ -468,6 +508,14 @@ func (r *NodeRecovery) deleteFailedPodsWithReasonNodeAffinity() error {
 	return errs
 }
 
+type healthStatus struct {
+	Health health `json:"health"`
+}
+
+type health struct {
+	Status string `json:"status"`
+}
+
 // getCephHealthStatus retrieves the health status of Ceph by querying the ceph client in the ceph tools pods
 //   - name: Montitor storage cluster returns to HEALTH_OK status
 //     shell: "oc rsh -n openshift-storage {{ TOOLS_POD }} ceph status -f json | jq -r '.health.status'"
@@ -480,14 +528,20 @@ func (r *NodeRecovery) getCephHealthStatus() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	stdout, stderr, err := r.cmdRunner.Run(p.Name, ODF_NAMESPACE, []string{"ceph", "status", "-f", "json", "|", "jq", "-r", "'.health.status'"})
+
+	stdout, stderr, err := r.cmdRunner.Run(p, []string{"ceph", "status", "-f", "json"})
 	if err != nil {
 		return "", err
 	}
 	if len(stderr) > 0 {
 		return "", fmt.Errorf("error while executing remote shell to retrieve the ceph health status: %s", stderr)
 	}
-	return stdout, nil
+	h := healthStatus{}
+	err = json.Unmarshal(stdout, &h)
+	if err != nil {
+		return "", err
+	}
+	return h.Health.Status, nil
 }
 
 // PENDING STATE PODS
@@ -680,12 +734,12 @@ func (r *NodeRecovery) forceDeleteRookCephOSDPods() error {
 //     delay: 10
 func (r *NodeRecovery) eraseDevice(nd *nodeDevice) error {
 	runner := pod.NewRunner(r.Config)
-	podName, nsName, cleanup, err := runner.Initialize(nd.nodeName)
+	pod, cleanup, err := runner.Initialize(nd.nodeName)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
-	stdOut, stdErr, err := r.cmdRunner.Run(podName, nsName, []string{"chroot", "/host", "sgdisk", "--zap-all", "/dev/" + nd.deviceName})
+	stdOut, stdErr, err := r.cmdRunner.Run(pod, []string{"chroot", "/host", "sgdisk", "--zap-all", "/dev/" + nd.deviceName})
 	if err != nil {
 		return fmt.Errorf("failed to erase disk %s in node %s:%v", nd.deviceName, nd.nodeName, err)
 	}
@@ -830,7 +884,6 @@ func getLatestCondition(instance *odfv1alpha1.NodeRecovery) *odfv1alpha1.Recover
 	return latest
 }
 
-func transitionNextCondition(instance *odfv1alpha1.NodeRecovery, current *odfv1alpha1.RecoveryCondition, nextCondition odfv1alpha1.RecoveryConditionType) {
-	current.Status = v1.ConditionFalse
-	instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: nextCondition, Status: v1.ConditionTrue, LastTransitionTime: metav1.Now(), LastProbeTime: metav1.Now()})
+func transitionNextCondition(instance *odfv1alpha1.NodeRecovery, nextCondition odfv1alpha1.RecoveryConditionType) {
+	instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: nextCondition, LastTransitionTime: metav1.Now(), LastProbeTime: metav1.Now()})
 }

@@ -12,12 +12,11 @@ rules:
   - create
   - patch
 - apiGroups:
-  - ""
+  - ocs.openshift.io
   resources:
-  - pods
+  - ocsinitializations
   verbs:
   - get
-  - list
 - apiGroups:
   - odf.openshift.io
   resources:

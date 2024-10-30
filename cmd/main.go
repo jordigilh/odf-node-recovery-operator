@@ -38,6 +38,14 @@ import (
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
+
+	templatev1 "github.com/openshift/api/template/v1"
+	corev1 "k8s.io/api/core/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
+	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -122,12 +130,16 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
+	scheme, err := getScheme(mgr.GetScheme())
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
 	config := ctrl.GetConfigOrDie()
 	if err = (&controller.NodeRecoveryReconciler{
 		Config:    config,
 		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
+		Scheme:    scheme,
 		Recorder:  mgr.GetEventRecorderFor("odf-node-recovery-controller"),
 		CmdRunner: pod.NewRemoteExecutor(config),
 	}).SetupWithManager(mgr); err != nil {
@@ -149,4 +161,18 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func getScheme(s *runtime.Scheme) (*runtime.Scheme, error) {
+	builder := append(runtime.SchemeBuilder{},
+		ocsoperatorv1.AddToScheme,
+		batchv1.AddToScheme,
+		corev1.AddToScheme,
+		appsv1.AddToScheme,
+		odfv1alpha1.AddToScheme,
+		templatev1.Install,
+		configv1.AddToScheme,
+	)
+	err := builder.AddToScheme(s)
+	return s, err
 }
