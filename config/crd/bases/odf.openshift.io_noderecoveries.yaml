@@ -16,7 +16,21 @@ spec:
     singular: noderecovery
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.startTime
+      name: Created At
+      type: string
+    - jsonPath: .status.completionTime
+      name: Completed At
+      type: string
+    - description: Status
+      jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.conditions[?(@.status=="True")].type
+      name: State
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NodeRecovery is the Schema for the noderecoveries API
@@ -74,6 +88,13 @@ spec:
                       description: Unique, one-word, CamelCase reason for the condition's
                         last transition.
                       type: string
+                    status:
+                      description: Status is the status of the condition. Can be True,
+                        False, Unknown
+                      enum:
+                      - "True"
+                      - "False"
+                      type: string
                     type:
                       description: Type is the type of the condition.
                       type: string
@@ -100,6 +121,10 @@ spec:
                 description: |-
                   INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
                   Important: Run "make" to regenerate code after modifying this file
+                enum:
+                - Running
+                - Completed
+                - Failed
                 type: string
               startTime:
                 format: date-time

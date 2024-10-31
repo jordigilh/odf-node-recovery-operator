@@ -13,7 +13,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type healthStatus struct {
@@ -134,7 +133,7 @@ func (r *NodeRecovery) forceDeleteRookCephOSDPods() error {
 //     retries: 30
 //     delay: 10
 func (r *NodeRecovery) eraseDevice(nd *nodeDevice) error {
-	runner := pod.NewRunner(r.Config)
+	runner := pod.NewRunner(r.Config, r.log)
 	pod, cleanup, err := runner.Initialize(nd.nodeName)
 	if err != nil {
 		return err
@@ -144,7 +143,7 @@ func (r *NodeRecovery) eraseDevice(nd *nodeDevice) error {
 	if err != nil {
 		return fmt.Errorf("failed to erase disk %s in node %s:%v", nd.deviceName, nd.nodeName, err)
 	}
-	log.Log.Info("stdout/stderr: %s/%s", stdOut, stdErr)
+	r.log.V(6).Info("stdout", string(stdOut), "stderr", stdErr)
 	return nil
 }
 

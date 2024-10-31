@@ -51,7 +51,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -66,7 +65,7 @@ type NodeRecovery struct {
 	log       logr.Logger
 }
 
-func newNodeRecoveryReconciler(ctx context.Context, client client.Client, restConfig *rest.Config, scheme *runtime.Scheme, recorder record.EventRecorder, cmdRunner pod.RemoteCommandExecutor) (*NodeRecovery, error) {
+func newNodeRecoveryReconciler(ctx context.Context, log logr.Logger, client client.Client, restConfig *rest.Config, scheme *runtime.Scheme, recorder record.EventRecorder, cmdRunner pod.RemoteCommandExecutor) (*NodeRecovery, error) {
 
 	return &NodeRecovery{
 		Client:    client,
@@ -75,7 +74,7 @@ func newNodeRecoveryReconciler(ctx context.Context, client client.Client, restCo
 		Scheme:    scheme,
 		recorder:  recorder,
 		cmdRunner: cmdRunner,
-		log:       log.FromContext(ctx).WithValues("odf-node-reconciler"),
+		log:       log,
 	}, nil
 }
 
@@ -92,7 +91,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 
 	latestCondition := getLatestCondition(instance)
 	if time.Now().After(latestCondition.LastTransitionTime.Time.Add(5 * time.Minute)) {
-		r.log.Error(fmt.Errorf("failed to reconcile after retrying for 5 minutes: %s", latestCondition.Message), "failed to reconcile")
+		r.log.V(5).Error(fmt.Errorf("failed to reconcile after retrying for 5 minutes"), "reason", latestCondition.Message)
 		instance.Status.Phase = odfv1alpha1.FailedPhase
 		r.recorder.Eventf(instance, "Error", "Reconciliation", fmt.Sprintf("failed to reconcile after retrying for 5 minutes: %s", latestCondition.Message))
 		return ctrl.Result{}, nil
@@ -141,7 +140,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			// there are stil pods initializing... requeuing.
 			latestCondition.Reason = odfv1alpha1.WaitingForPodsToInitialize
 			latestCondition.Message = fmt.Sprintf("OSD pods still in initializing status: %v", podErr)
-			r.log.V(5).Info("Requeuing due to pods not yet initialized: %v", podErr)
+			r.log.V(5).Info("Requeuing due to pods not yet initialized with", "error", podErr)
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.LabelNodesWithPendingPods)
@@ -638,5 +637,6 @@ func getLatestCondition(instance *odfv1alpha1.NodeRecovery) *odfv1alpha1.Recover
 }
 
 func transitionNextCondition(instance *odfv1alpha1.NodeRecovery, nextCondition odfv1alpha1.RecoveryConditionType) {
-	instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: nextCondition, LastTransitionTime: metav1.Now(), LastProbeTime: metav1.Now()})
+	instance.Status.Conditions[len(instance.Status.Conditions)-1].Status = odfv1alpha1.StatusFalse
+	instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: nextCondition, LastTransitionTime: metav1.Now(), LastProbeTime: metav1.Now(), Status: odfv1alpha1.StatusTrue})
 }

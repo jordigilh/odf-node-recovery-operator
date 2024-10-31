@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -56,12 +55,6 @@ type NodeRecoveryReconciler struct {
 // Events
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
-// +kubebuilder:printcolumn:name="Name",type=date,JSONPath=.metadata.name
-// +kubebuilder:printcolumn:name="Created At",type=string,JSONPath=.status.startTime
-// +kubebuilder:printcolumn:name="Completed At",type=string,JSONPath=.status.completionTime
-// +kubebuilder:printcolumn:name="Phase",type=date,JSONPath=.status.phase,description="Current Phase"
-// +kubebuilder:printcolumn:name="Last Condition",type=string,JSONPath=.status.conditions[:-1].type,description="Current Phase"
-
 // +operator-sdk:csv:customresourcedefinitions:displayName="ODF Node Recovery"
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -75,33 +68,33 @@ type NodeRecoveryReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 
 func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx).WithValues("odf-node-recovery-controller", req.NamespacedName)
+	log := log.FromContext(ctx).WithName("odf-node-recovery-controller")
 
-	log.V(3).Info("Reconciling NodeRecovery...")
+	log.V(5).Info("Reconciling NodeRecovery", "name", req.Name)
 	// Lookup the instance for this reconcile request
 	instance := &odfv1alpha1.NodeRecovery{}
 	var err error
 
 	if err = r.Get(ctx, req.NamespacedName, instance); client.IgnoreNotFound(err) != nil {
-		log.Error(err, "Unable to fetch NodeRecovery")
+		log.V(3).Error(err, "Unable to fetch NodeRecovery", "name", req.Name)
 		return ctrl.Result{}, err
 	}
 
-	log.V(3).Info("NodeRecovery fetched...", "name", instance.Name)
+	log.V(5).Info("NodeRecovery fetched...", "name", instance.Name)
 	if apierrors.IsNotFound(err) || !instance.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
 	if instance.Status.Phase == odfv1alpha1.FailedPhase ||
 		instance.Status.Phase == odfv1alpha1.CompletedPhase {
-		log.V(5).Info(fmt.Sprintf("Attempting to process CR %s which is in %s phase. Ignoring...", instance.Name, string(instance.Status.Phase)))
+		log.V(5).Info("Attempting to process CR", instance.Name, "which is in", string(instance.Status.Phase), "Ignoring...")
 		return ctrl.Result{}, nil
 	}
 	if instance.Status.StartTime.IsZero() {
 		instance.Status.StartTime = &metav1.Time{Time: time.Now()}
 		instance.Status.Phase = odfv1alpha1.RunningPhase
-		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, LastTransitionTime: metav1.Now()})
+		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, LastTransitionTime: metav1.Now(), Status: odfv1alpha1.StatusTrue})
 	}
-	recoverer, err := newNodeRecoveryReconciler(ctx, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
+	recoverer, err := newNodeRecoveryReconciler(ctx, log, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
 	if err != nil {
 		return ctrl.Result{}, err
 	}

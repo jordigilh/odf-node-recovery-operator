@@ -42,6 +42,9 @@ var (
 	FailedPhase    RecoveryPhase = "Failed"
 	CompletedPhase RecoveryPhase = "Completed"
 
+	StatusTrue  StatusType = "True"
+	StatusFalse StatusType = "False"
+
 	FailedCheckCephToolsPod              RecoveryConditionReason = "FailedCheckCephToolsPod"
 	FailedRetrieveCephToolPod            RecoveryConditionReason = "FailedRetrieveCephToolPod"
 	FailedEnableCephToolsPod             RecoveryConditionReason = "FailedEnableCephToolsPod"
@@ -73,7 +76,13 @@ type RecoveryCondition struct {
 	// Human-readable message indicating details about last transition.
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
+
+	// Status is the status of the condition. Can be True, False, Unknown
+	// +kubebuilder:validation:Enum={"True","False"}
+	Status StatusType `json:"status,omitempty"`
 }
+
+type StatusType string
 
 type RecoveryPhase string
 
@@ -81,13 +90,12 @@ type RecoveryPhase string
 type NodeRecoveryStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	// +kubebuilder:validation:Enum={"Running","Completed", "Failed"}
 	Phase RecoveryPhase `json:"phase,omitempty" protobuf:"bytes,1,opt,name=phase,casttype=RecoveryPhase"`
 	// Current conditions state of CR.
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
+	// +kubebuilder:validation:Optional
 	Conditions []RecoveryCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 
 	StartTime *metav1.Time `json:"startTime,omitempty" protobuf:"bytes,2,opt,name=startTime"`
@@ -109,13 +117,15 @@ type NodeRecoveryStatus struct {
 	CrashLoopBackOffPods bool `json:"crashLoopBackOffPods,omitempty"`
 }
 
-// +genclient
-// +genclient:nonNamespaced
+// NodeRecovery is the Schema for the noderecoveries API
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=noderec
-// NodeRecovery is the Schema for the noderecoveries API
+// +kubebuilder:printcolumn:name="Created At",type=string,JSONPath=.status.startTime
+// +kubebuilder:printcolumn:name="Completed At",type=string,JSONPath=.status.completionTime
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=.status.phase,description="Status"
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=.status.conditions[?(@.status=="True")].type
 type NodeRecovery struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

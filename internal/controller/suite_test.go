@@ -36,6 +36,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	configv1 "github.com/openshift/api/config/v1"
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -78,13 +79,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	//+kubebuilder:scaffold:scheme
-
-	// scheme := createFakeScheme()
-	// k8sClient = fake.NewClientBuilder().WithScheme(scheme).Build()
-	// Expect(err).NotTo(HaveOccurred())
-	// Expect(k8sClient).NotTo(BeNil())
-
 })
 
 var _ = AfterSuite(func() {
@@ -102,6 +96,7 @@ func createFakeScheme() *kruntime.Scheme {
 		appsv1.AddToScheme,
 		v1alpha1.AddToScheme,
 		templatev1.Install,
+		configv1.AddToScheme,
 	)
 	Expect(builder.AddToScheme(s)).To(Succeed())
 	return s

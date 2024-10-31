@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
 	policyapi "k8s.io/pod-security-admission/api"
 )
 
@@ -16,10 +16,11 @@ const IMAGE_PULLSPEC = "registry.redhat.io/rhel8/support-tools"
 
 type Runner struct {
 	kcli *kubernetes.Clientset
+	log  logr.Logger
 }
 
-func NewRunner(config *restclient.Config) *Runner {
-	return &Runner{kcli: kubernetes.NewForConfigOrDie(config)}
+func NewRunner(config *restclient.Config, log logr.Logger) *Runner {
+	return &Runner{kcli: kubernetes.NewForConfigOrDie(config), log: log}
 }
 
 // Initialize creates a temporal namespace with privileged labels and deploys a pod with the node's filesyste mounted in /host
@@ -64,7 +65,7 @@ func (c *Runner) createNamespace() (string, func(), error) {
 
 	cleanup := func() {
 		if err := c.kcli.CoreV1().Namespaces().Delete(context.TODO(), ns.Name, metav1.DeleteOptions{}); err != nil {
-			klog.V(2).Infof("Unable to delete temporary namespace %s: %v", ns.Name, err)
+			c.log.V(5).Error(err, "unable to delete temporary", "namespace", ns.Name)
 		}
 	}
 
