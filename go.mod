@@ -1,6 +1,6 @@
 module github.com/jordigilh/odf-node-recovery-operator
 
-go 1.22.8
+go 1.22.7
 
 require (
 	github.com/hashicorp/go-version v1.7.0

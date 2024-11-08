@@ -100,6 +100,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.EnableCephToolsPod:
 		enabled, err := r.isCephToolsEnabled()
 		if err != nil {
+			r.log.Error(err, "failed to check if Ceph tools pod is enabled")
 			latestCondition.Reason = odfv1alpha1.FailedCheckCephToolsPod
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -107,6 +108,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		if !enabled {
 			err = r.enableCephTools()
 			if err != nil {
+				r.log.Error(err, "failed to enable Ceph tools pod")
 				latestCondition.Reason = odfv1alpha1.FailedEnableCephToolsPod
 				latestCondition.Message = err.Error()
 				return ctrl.Result{}, err
@@ -117,6 +119,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.WaitForCephToolsPodRunning:
 		phase, err := r.getCephToolsPodPhase()
 		if err != nil {
+			r.log.Error(err, "failed to retrieve Ceph tools pod phase")
 			latestCondition.Reason = odfv1alpha1.FailedRetrieveCephToolPod
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -132,6 +135,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		//  WAIT FOR PODS TO STABILIZE
 		podErr, err := r.hasPodsInCreatingOrInitializingState()
 		if err != nil {
+			r.log.Error(err, "failed to retrieve list of pods in creating or initializing state")
 			latestCondition.Reason = odfv1alpha1.FailedRetrievePodsPhase
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -140,7 +144,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			// there are stil pods initializing... requeuing.
 			latestCondition.Reason = odfv1alpha1.WaitingForPodsToInitialize
 			latestCondition.Message = fmt.Sprintf("OSD pods still in initializing status: %v", podErr)
-			r.log.V(5).Info("Requeuing due to pods not yet initialized with", "error", podErr)
+			r.log.Error(podErr, "Requeuing due to pods not yet initialized with")
 			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.LabelNodesWithPendingPods)
@@ -148,6 +152,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.LabelNodesWithPendingPods:
 		pendingOSDPods, err := r.getPodsInPendingPhase()
 		if err != nil {
+			r.log.Error(err, "failed to retrieve list of pods in pending state")
 			latestCondition.Reason = odfv1alpha1.FailedRetrievePendingPods
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -157,6 +162,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.PendingPods = true
 			err = r.labelNodesWithPodsInPendingState(pendingOSDPods)
 			if err != nil {
+				r.log.Error(err, "failed to label nodes with pods in pending state")
 				latestCondition.Reason = odfv1alpha1.FailedLabelNodes
 				latestCondition.Message = err.Error()
 				return ctrl.Result{}, err
@@ -168,6 +174,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		// INITCRASHLOOKBACKOFF STATE PODS
 		osdPods, err := r.getOSDPodsInCrashLoopBackOff()
 		if err != nil {
+			r.log.Error(err, "failed to retrieve list of OSD specific pods in CrashLoopbackOff")
 			latestCondition.Reason = odfv1alpha1.FailedRetrieveCrashLoopBackOffPods
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -176,6 +183,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.CrashLoopBackOffPods = true
 			c, err := r.handleCrashLoopBackOffPods(osdPods)
 			if err != nil {
+				r.log.Error(err, "failed to handle pods in CrashLoopbackOff")
 				latestCondition.Reason = odfv1alpha1.FailedHandleCrashLoopBackOffPods
 				latestCondition.Message = err.Error()
 				return c, err
@@ -188,6 +196,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.CleanupOSDRemovalJob:
 		pod, err := r.getOSDRemovalPodJobCompletionStatus()
 		if err != nil {
+			r.log.Error(err, "failed to retrieve the OSD removal pod job")
 			return ctrl.Result{}, err
 		}
 		if pod.Status.Phase != v1.PodSucceeded {
@@ -195,6 +204,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		}
 		err = r.deleteOldOSDRemovalJob()
 		if err != nil {
+			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
 		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
@@ -203,6 +213,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		if instance.Status.PendingPods || instance.Status.CrashLoopBackOffPods {
 			err := r.restartStorageOperator()
 			if err != nil {
+				r.log.Error(err, "failed to restart the storage operator")
 				latestCondition.Reason = odfv1alpha1.FailedRestartODFOperator
 				latestCondition.Message = err.Error()
 				return ctrl.Result{}, err
@@ -213,12 +224,14 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.DeleteFailedPodsNodeAffinity:
 		err := r.deleteFailedPodsWithReasonNodeAffinity()
 		if err != nil {
+			r.log.Error(err, "failed to delete failed pods with reason node affinity")
 			latestCondition.Reason = odfv1alpha1.FailedDeleteFailedPodsNodeAffinity
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
 		err = r.archiveCephDaemonCrashMessages()
 		if err != nil {
+			r.log.Error(err, "failed to archive ceph daemon crash messages")
 			latestCondition.Reason = odfv1alpha1.FailedArchiveCephDaemonCrashMessages
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
@@ -228,11 +241,13 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.StorageClusterFitnessCheck:
 		status, err := r.getCephHealthStatus()
 		if err != nil {
+			r.log.Error(err, "failed to get Ceph health status")
 			latestCondition.Reason = odfv1alpha1.FailedRetrieveCephHealthStatus
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
 		if status != HEALTH_OK {
+			latestCondition.Message = fmt.Sprintf("Waiting for cluster to become healthy: %s", status)
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.DisableCephTools)
@@ -240,6 +255,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	case odfv1alpha1.DisableCephTools:
 		err := r.disableCephTools()
 		if err != nil {
+			r.log.Error(err, "failed to disable Ceph tools")
 			latestCondition.Reason = odfv1alpha1.FailedDisableCephToolsPod
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err

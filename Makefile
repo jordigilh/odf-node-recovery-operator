@@ -29,7 +29,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # openshift.io/odf-node-recovery-operator-bundle:$VERSION and openshift.io/odf-node-recovery-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= openshift.io/odf-node-recovery-operator
+IMAGE_TAG_BASE ?= quay.io/jordigilh/odf-node-recovery-controller
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -51,7 +51,7 @@ endif
 OPERATOR_SDK_VERSION ?= v1.35.0
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= $(IMAGE_TAG_BASE):latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.31.0
 
@@ -66,7 +66,7 @@ endif
 # Be aware that the target commands are only tested with Docker which is
 # scaffolded by default. However, you might want to replace it to use other
 # tools. (i.e. podman)
-CONTAINER_TOOL ?= docker
+CONTAINER_TOOL ?= podman
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.

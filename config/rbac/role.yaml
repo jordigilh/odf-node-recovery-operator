@@ -12,11 +12,71 @@ rules:
   - create
   - patch
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - persistentvolumes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - delete
+  - deletecollection
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/exec
+  verbs:
+  - create
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - delete
+  - get
+- apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - ocs.openshift.io
   resources:
   - ocsinitializations
+  - storageclusters
   verbs:
   - get
+  - list
+  - update
+  - watch
 - apiGroups:
   - odf.openshift.io
   resources:
@@ -43,3 +103,9 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - template.openshift.io
+  resources:
+  - templates
+  verbs:
+  - get

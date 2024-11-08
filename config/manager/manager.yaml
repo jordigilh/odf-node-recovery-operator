@@ -98,5 +98,5 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-      serviceAccountName: odf-recovery
+      serviceAccountName: odf-node-recovery-operator-controller-manager
       terminationGracePeriodSeconds: 10

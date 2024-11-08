@@ -8,7 +8,7 @@ metadata:
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions: {}
-  description: fdsa
+  description: ODF Node Recovery
   displayName: operator
   icon:
   - base64data: ""
@@ -27,12 +27,13 @@ spec:
   - supported: true
     type: AllNamespaces
   keywords:
-  - fsda
+  - odf, node recovery
   links:
   - name: Odf Node Recovery Operator
     url: https://odf-node-recovery-operator.domain
   maturity: alpha
+  minKubeVersion: 1.25.0
   provider:
-    name: fds
-    url: fdsa
+    name: Red Hat
+    url: www.redhat.com
   version: 0.0.0

@@ -46,12 +46,24 @@ type NodeRecoveryReconciler struct {
 	CmdRunner pod.RemoteCommandExecutor
 }
 
+// Node Recovery
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=odf.openshift.io,resources=noderecoveries/finalizers,verbs=update
 
-// OCS
-//+kubebuilder:rbac:groups=ocs.openshift.io,resources=ocsinitializations,verbs=get
+// OCP
+//+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
+//+kubebuilder:rbac:groups=template.openshift.io,resources=templates,verbs=get
+//+kubebuilder:rbac:groups=ocs.openshift.io,resources=storageclusters;ocsinitializations,verbs=get;update;watch;list
+
+//K8s
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;watch;deletecollection
+//+kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;update;watch
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;delete
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;update
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims;persistentvolumes,verbs=get;list;watch
+
 // Events
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 
@@ -70,23 +82,23 @@ type NodeRecoveryReconciler struct {
 func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx).WithName("odf-node-recovery-controller")
 
-	log.V(5).Info("Reconciling NodeRecovery", "name", req.Name)
+	log.Info("Reconciling NodeRecovery", "name", req.Name)
 	// Lookup the instance for this reconcile request
 	instance := &odfv1alpha1.NodeRecovery{}
 	var err error
 
 	if err = r.Get(ctx, req.NamespacedName, instance); client.IgnoreNotFound(err) != nil {
-		log.V(3).Error(err, "Unable to fetch NodeRecovery", "name", req.Name)
+		log.Error(err, "Unable to fetch NodeRecovery", "name", req.Name)
 		return ctrl.Result{}, err
 	}
 
-	log.V(5).Info("NodeRecovery fetched...", "name", instance.Name)
+	log.Info("NodeRecovery fetched...", "name", instance.Name)
 	if apierrors.IsNotFound(err) || !instance.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
 	if instance.Status.Phase == odfv1alpha1.FailedPhase ||
 		instance.Status.Phase == odfv1alpha1.CompletedPhase {
-		log.V(5).Info("Attempting to process CR", instance.Name, "which is in", string(instance.Status.Phase), "Ignoring...")
+		log.Info("Attempting to process CR", "name", instance.Name, "which is in", string(instance.Status.Phase), "Ignoring...")
 		return ctrl.Result{}, nil
 	}
 	if instance.Status.StartTime.IsZero() {
