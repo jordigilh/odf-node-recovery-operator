@@ -17,10 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,10 +36,10 @@ import (
 	templatev1 "github.com/openshift/api/template/v1"
 	"github.com/openshift/library-go/pkg/template/generator"
 	"github.com/openshift/library-go/pkg/template/templateprocessing"
-	localv1 "github.com/openshift/local-storage-operator/pkg/common"
 	ocsoperatorv1 "github.com/red-hat-storage/ocs-operator/api/v1"
 	"github.com/red-hat-storage/ocs-operator/controllers/defaults"
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
+	"k8s.io/client-go/kubernetes"
 
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -80,18 +83,12 @@ func newNodeRecoveryReconciler(ctx context.Context, log logr.Logger, client clie
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Pod object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Result, error) {
-
 	latestCondition := getLatestCondition(instance)
-	if time.Now().After(latestCondition.LastTransitionTime.Time.Add(5 * time.Minute)) {
-		r.log.V(5).Error(fmt.Errorf("failed to reconcile after retrying for 5 minutes"), "reason", latestCondition.Message)
+	if time.Now().After(latestCondition.LastTransitionTime.Time.Add(reconciliationTimeout)) {
+		r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", reconciliationTimeout.Minutes()), "reason", latestCondition.Message)
 		instance.Status.Phase = odfv1alpha1.FailedPhase
 		r.recorder.Eventf(instance, "Error", "Reconciliation", fmt.Sprintf("failed to reconcile after retrying for 5 minutes: %s", latestCondition.Message))
 		return ctrl.Result{}, nil
@@ -179,39 +176,139 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
-		if len(osdPods) > 0 {
-			instance.Status.CrashLoopBackOffPods = true
-			c, err := r.handleCrashLoopBackOffPods(osdPods)
-			if err != nil {
-				r.log.Error(err, "failed to handle pods in CrashLoopbackOff")
-				latestCondition.Reason = odfv1alpha1.FailedHandleCrashLoopBackOffPods
-				latestCondition.Message = err.Error()
-				return c, err
-			}
-			transitionNextCondition(instance, odfv1alpha1.CleanupOSDRemovalJob)
-			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		if len(osdPods) == 0 {
+			transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
+			return ctrl.Result{Requeue: true}, nil
 		}
-		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
-		return ctrl.Result{Requeue: true}, nil
+		instance.Status.CrashLoopBackOffPods = true
+		nodeDevice, osdIDs, c, err := r.handleCrashLoopBackOffPods(osdPods)
+		if err != nil {
+			r.log.Error(err, "failed to handle pods in CrashLoopbackOff")
+			latestCondition.Reason = odfv1alpha1.FailedHandleCrashLoopBackOffPods
+			latestCondition.Message = err.Error()
+			return c, err
+		}
+		instance.Status.NodeDevice = nodeDevice
+		instance.Status.CrashedOSDDeploymentIDs = osdIDs
+		transitionNextCondition(instance, odfv1alpha1.ForceDeleteRookCephOSDPods)
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	case odfv1alpha1.ForceDeleteRookCephOSDPods:
+		if !instance.Status.CrashLoopBackOffPods {
+			transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
+			return ctrl.Result{Requeue: true}, nil
+		}
+		for _, id := range instance.Status.CrashedOSDDeploymentIDs {
+			pods, err := r.getOSDPodsWithID(id)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			if len(pods.Items) > 0 {
+				if time.Now().After(pods.Items[0].DeletionTimestamp.Add(time.Minute)) {
+					return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+				}
+			}
+		}
+		// pods have been deleting for over a minute, force delete them.
+		err := r.forceDeleteRookCephOSDPods(instance.Status.CrashedOSDDeploymentIDs)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		err = r.deleteOldOSDRemovalJob()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		osdPods, err := r.getOSDPods()
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		instance.Status.ForcedOSDRemoval = len(osdPods.Items) <= 3
+		err = r.processOCSOSDRemovalTemplate(instance.Status.CrashedOSDDeploymentIDs, instance.Status.ForcedOSDRemoval)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		transitionNextCondition(instance, odfv1alpha1.CleanupOSDRemovalJob)
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+
 	case odfv1alpha1.CleanupOSDRemovalJob:
 		pod, err := r.getOSDRemovalPodJobCompletionStatus()
 		if err != nil {
 			r.log.Error(err, "failed to retrieve the OSD removal pod job")
+			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
 		if pod.Status.Phase != v1.PodSucceeded {
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			if time.Now().Before(latestCondition.LastTransitionTime.Time.Add(osdRemovalJobTimeout)) {
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", osdRemovalJobTimeout.Minutes()), "timed out waiting for the OSD removal job to complete")
+			r.recorder.Eventf(instance, "Warning", "Reconciliation", fmt.Sprintf("OSD removal job timed out after %.f minutes. Retrying with %s=%t", osdRemovalJobTimeout.Minutes(), FORCE_OSD_REMOVAL, enableForcedOSDRemoval))
+			err = r.deleteOldOSDRemovalJob()
+			if err != nil {
+				r.log.Error(err, "failed to delete OSD removal jobs")
+				return ctrl.Result{}, err
+			}
+			err = r.processOCSOSDRemovalTemplate(instance.Status.CrashedOSDDeploymentIDs, enableForcedOSDRemoval)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			instance.Status.ForcedOSDRemoval = true
+			transitionNextCondition(instance, odfv1alpha1.RetryForceCleanupOSDRemovalJob)
+			return ctrl.Result{Requeue: true}, nil
+		}
+		if err = r.validateJobLogs(pod.Name); err != nil {
+			latestCondition.Message = err.Error()
+			instance.Status.Phase = odfv1alpha1.FailedPhase
+			return ctrl.Result{}, err
 		}
 		err = r.deleteOldOSDRemovalJob()
 		if err != nil {
 			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
 		}
+		transitionNextCondition(instance, odfv1alpha1.DeletePersistentVolume)
+		return ctrl.Result{Requeue: true}, nil
+	case odfv1alpha1.RetryForceCleanupOSDRemovalJob:
+		pod, err := r.getOSDRemovalPodJobCompletionStatus()
+		if err != nil {
+			r.log.Error(err, "failed to retrieve the OSD removal pod job")
+			latestCondition.Message = err.Error()
+			return ctrl.Result{}, err
+		}
+		if pod.Status.Phase != v1.PodSucceeded {
+			if time.Now().Before(latestCondition.LastTransitionTime.Time.Add(osdRemovalJobTimeout)) {
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			}
+			r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes with enabled forced OSD Removal flag", osdRemovalJobTimeout.Minutes()), "timed out waiting for the OSD removal job to complete")
+			r.recorder.Eventf(instance, "Warning", "Reconciliation", fmt.Sprintf("OSD removal job timed out after %.f minutes.", osdRemovalJobTimeout.Minutes()))
+			instance.Status.Phase = odfv1alpha1.FailedPhase
+			return ctrl.Result{}, nil
+		}
+		// retrieve the pod logs and validate that it completed successfully
+		if err = r.validateJobLogs(pod.Name); err != nil {
+			latestCondition.Message = err.Error()
+			instance.Status.Phase = odfv1alpha1.FailedPhase
+			return ctrl.Result{}, err
+		}
+		err = r.deleteOldOSDRemovalJob()
+		if err != nil {
+			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
+			return ctrl.Result{}, err
+		}
+		transitionNextCondition(instance, odfv1alpha1.DeletePersistentVolume)
+		return ctrl.Result{Requeue: true}, nil
+	case odfv1alpha1.DeletePersistentVolume:
+		for _, nd := range instance.Status.NodeDevice {
+			err := r.deletePV(nd.PersistentVolumeName)
+			if err != nil {
+				r.log.Error(fmt.Errorf("failed to delete PV"), "pv", nd.PersistentVolumeName)
+				latestCondition.Message = fmt.Sprintf("failed to delete PV %s in node %s", nd.PersistentVolumeName, nd.NodeName)
+			}
+		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.RestartStorageOperator:
 		if instance.Status.PendingPods || instance.Status.CrashLoopBackOffPods {
-			err := r.restartStorageOperator()
+			err := r.deleteRookCephOperatorPod()
 			if err != nil {
 				r.log.Error(err, "failed to restart the storage operator")
 				latestCondition.Reason = odfv1alpha1.FailedRestartODFOperator
@@ -263,70 +360,36 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	}
 	instance.Status.Phase = odfv1alpha1.CompletedPhase
 	instance.Status.CompletionTime = &metav1.Time{Time: time.Now()}
-	r.recorder.Eventf(instance, "Info", "Reconciliation", "Successfully completed recovering cluster in %s", instance.Status.CompletionTime.Sub(instance.Status.StartTime.Time))
+	r.recorder.Eventf(instance, "Normal", "Reconciliation", "Successfully completed recovering cluster in %s", instance.Status.CompletionTime.Sub(instance.Status.StartTime.Time))
 	return ctrl.Result{}, nil
 }
 
-func (r *NodeRecovery) handleCrashLoopBackOffPods(osdPods []v1.Pod) (reconcile.Result, error) {
-	diskDevices := []nodeDevice{}
-
+// handleCrashLoopBackOffPods identifies the OSD pods that are in CrashLoopbackOff status. The function then proceeds to
+// scale the deployment of these pods to 0 replicas. The function returns a structure that contains the node name,
+// PV and the OSD id associated to these pods
+func (r *NodeRecovery) handleCrashLoopBackOffPods(osdPods []v1.Pod) ([]odfv1alpha1.NodePV, []string, reconcile.Result, error) {
+	nodePV := []odfv1alpha1.NodePV{}
+	osdIDs := []string{}
 	for _, p := range osdPods {
 		nodeDevice, err := r.getNodeDeviceNameFromPV(&p)
 		if err != nil {
-			return ctrl.Result{}, err
+			return nil, nil, ctrl.Result{}, err
 		}
-		diskDevices = append(diskDevices, *nodeDevice)
-	}
-	err := r.scaleRookCephOSDDeploymentsToZero()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	pods, err := r.getRookCephOSDPods()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if len(pods.Items) > 0 {
-		if time.Now().After(pods.Items[0].DeletionTimestamp.Add(time.Minute)) {
-			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		nodePV = append(nodePV, *nodeDevice)
+		osdID, ok := p.Labels[osd.OsdIdLabelKey]
+		if !ok {
+			return nil, nil, ctrl.Result{}, fmt.Errorf("cannot determine OSD deployment object: missing label %s in pod %s/%s", p.Labels[osd.OsdIdLabelKey], p.Namespace, p.Name)
 		}
-		// pods have been deleting for over a minute, force delete them.
-		err = r.forceDeleteRookCephOSDPods()
+		osdIDs = append(osdIDs, osdID)
+		err = r.scaleRookCephOSDDeploymentToZero(osdID)
 		if err != nil {
-			return ctrl.Result{}, err
+			return nil, nil, ctrl.Result{}, err
 		}
 	}
-	//Erase devices before adding to OCS cluster
-	for _, dd := range diskDevices {
-		err = r.eraseDevice(&dd)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-	err = r.deleteOldOSDRemovalJob()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	err = r.processOCSOSDRemovalTemplate(osdPods)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	return nodePV, osdIDs, ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 // hasPodsInCreatingOrInitializingState checks for pods that are in the creating state or initializing and returns an error that contains all references to the pods
-// #
-// # WAIT FOR PODS TO STABILIZE
-// #
-//   - name: Waiting for OCS pods' states to stabilize as Running, Pending, or error condition
-//     shell: "oc get -n openshift-storage pods --no-headers"
-//     register: osd_pods
-//     # until: (osd_pods.stdout | regex_search('Init:[0-9]+\/[0-9]+') == none) and (osd_pods.stdout | regex_search('ContainerCreating') == none) and (osd_pods.stdout | regex_search('PodInitializing') == none)
-//     until:
-//   - osd_pods.stdout | regex_search('Init:[0-9]+\/[0-9]+') == none
-//   - osd_pods.stdout | regex_search('ContainerCreating') == none
-//   - osd_pods.stdout | regex_search('PodInitializing') == none
-//     retries: 60
-//     delay: 10
 func (r *NodeRecovery) hasPodsInCreatingOrInitializingState() (error, error) {
 	pods := &v1.PodList{}
 	err := r.List(r.ctx, pods, &client.ListOptions{Namespace: ODF_NAMESPACE})
@@ -345,12 +408,15 @@ func (r *NodeRecovery) hasPodsInCreatingOrInitializingState() (error, error) {
 	return errs, nil
 }
 
+// getStorageCluster returns the StorageCluster object instance named "ocs-storagecluster". This object
+// is used in OCP >4.15 to manage the ceph tools pod
 func (r *NodeRecovery) getStorageCluster() (*ocsoperatorv1.StorageCluster, error) {
 	sc := &ocsoperatorv1.StorageCluster{}
 	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocs-storagecluster"}, sc, &client.GetOptions{})
 	return sc, err
 }
 
+// getOCPVersion returns the OCP semver of the running cluster
 func (r *NodeRecovery) getOCPVersion() (*version.Version, error) {
 	c := &configv1.ClusterVersion{}
 	err := r.Get(r.ctx, types.NamespacedName{Name: "version"}, c)
@@ -364,12 +430,17 @@ func (r *NodeRecovery) getOCPVersion() (*version.Version, error) {
 	}
 	return nil, fmt.Errorf("no valid version found in clusterversion object")
 }
+
+// getOSCInitialization returns the OCSInitialization object instance named "ocsinit". This object
+// is used in OCP <=4.14 to manage the ceph tools pod
 func (r NodeRecovery) getOSCInitialization() (*ocsoperatorv1.OCSInitialization, error) {
 	o := &ocsoperatorv1.OCSInitialization{}
 	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocsinit"}, o, &client.GetOptions{})
 	return o, err
 }
 
+// getPodsInPendingPhase returns a podList object that contains all the ODF pods in the openshift-storage namespace
+// that are in Pending phase
 func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 	l := &v1.PodList{}
 	err := r.List(r.ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE}, &client.MatchingFields{podStatusPhaseFieldSelector: string(v1.PodPending)}, &client.MatchingLabels{"app": "rook-ceph-osd"})
@@ -379,15 +450,7 @@ func (r *NodeRecovery) getPodsInPendingPhase() (*v1.PodList, error) {
 	return l, nil
 }
 
-// STORAGE CLUSTER FITNESS CHECK
-//
-// getPodsInFailedPhaseWithReasonNodeAffinity retrieves a slice of pods that are in failed phase and the reason is due to NodeAffinity
-//   - name: Get pods stuck in NodeAffinity status
-//     shell: "oc get -n openshift-storage pods --field-selector=status.phase==\"Failed\" -o jsonpath='{range .items[?(@.status.reason==\"NodeAffinity\")]}{.metadata.name}{\"\\n\"}{end}'"
-//     register: nodeaffinity_pods
-//     until: nodeaffinity_pods.rc == 0
-//     retries: 30
-//     delay: 10
+// getPodsInFailedPhaseWithReasonNodeAffinity returns a slice of pods that are in failed phase and the reason is due to NodeAffinity
 func (r *NodeRecovery) getPodsInFailedPhaseWithReasonNodeAffinity() ([]v1.Pod, error) {
 	l := &v1.PodList{}
 	failedPods := []v1.Pod{}
@@ -404,14 +467,6 @@ func (r *NodeRecovery) getPodsInFailedPhaseWithReasonNodeAffinity() ([]v1.Pod, e
 }
 
 // deleteFailedPodsWithReasonNodeAffinity deletes pods that are in failed phase and the reason is due to NodeAffinity
-//   - name: Delete any pods stuck in NodeAffinity status
-//     shell: "oc delete pod {{ item }} -n openshift-storage"
-//     register: result
-//     with_items: "{{ nodeaffinity_pods.stdout_lines }}"
-//     when: 'nodeaffinity_pods.stdout_lines | length > 0'
-//     until: result.rc == 0
-//     retries: 30
-//     delay: 10
 func (r *NodeRecovery) deleteFailedPodsWithReasonNodeAffinity() error {
 	failedPods, err := r.getPodsInFailedPhaseWithReasonNodeAffinity()
 	if err != nil {
@@ -427,8 +482,6 @@ func (r *NodeRecovery) deleteFailedPodsWithReasonNodeAffinity() error {
 	return errs
 }
 
-// PENDING STATE PODS
-//
 // labelNodesWithPodsInPendingState labels the nodes where pods are in pending state
 func (r *NodeRecovery) labelNodesWithPodsInPendingState(pods *v1.PodList) error {
 	nodes := map[string]struct{}{}
@@ -455,22 +508,11 @@ func (r *NodeRecovery) labelNodesWithPodsInPendingState(pods *v1.PodList) error 
 	return errs
 }
 
-// INITCRASHLOOKBACKOFF STATE PODS
-//   - name: Get pods stuck in CrashLoopBackOff or Error status
-//     shell: "oc get -n openshift-storage pods -l app=rook-ceph-osd --no-headers | grep 'CrashLoopBackOff\\|Error' | awk '{print $1}'"
-//     register: crash_pods
-//     until: crash_pods.rc == 0
-//     retries: 30
-//     delay: 10
+// getOSDPodsInCrashLoopBackOff returns a list of OSD pods whose reason is CrashLoopbackOff. These
+// pods have a label that matches the `app=rook-ceph-osd` condition.
 func (r *NodeRecovery) getOSDPodsInCrashLoopBackOff() ([]v1.Pod, error) {
-	l := &v1.PodList{}
 	pods := []v1.Pod{}
-	selectorMap := map[string]string{"app": "rook-ceph-osd"}
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
-	if err != nil {
-		return nil, err
-	}
-	err = r.List(r.ctx, l, &client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: selector})
+	l, err := r.getOSDPods()
 	if err != nil {
 		return nil, err
 	}
@@ -484,37 +526,8 @@ func (r *NodeRecovery) getOSDPodsInCrashLoopBackOff() ([]v1.Pod, error) {
 	return pods, nil
 }
 
-type nodeDevice struct {
-	nodeName   string
-	deviceName string
-}
-
-// getNodeDeviceNameFromPV returns a struct that contain the node and device name associated to the PV used by the pod
-// - name: Get pvc's
-//   shell: "oc get -n openshift-storage pod/{{ item }} -o jsonpath='{.metadata.labels.ceph\\.rook\\.io\/pvc}'"
-//   register: crash_pods_pvcs
-//   until: crash_pods.rc == 0
-//   with_items: "{{ crash_pods.stdout_lines }}"
-//   retries: 30
-//   delay: 10
-
-// - name: Get pv's
-//   shell: "oc get -n openshift-storage pvc/{{ item.stdout }} -o jsonpath='{.spec.volumeName}'"
-//   register: crash_pods_pvs
-//   until: crash_pods_pvs.rc == 0
-//   with_items: "{{ crash_pods_pvcs.results }}"
-//   retries: 30
-//   delay: 10
-
-// - name: Get devices
-//   shell: "oc get pv/{{ item.stdout }} -o jsonpath='{.metadata.labels.kubernetes\\.io/hostname}{\",\"}{.metadata.annotations.storage\\.openshift\\.com\/device-name}'"
-//   register: osd_pods_devices
-//   until: osd_pods_devices.rc == 0
-//   with_items: "{{ crash_pods_pvs.results }}"
-//   retries: 30
-//   delay: 10
-
-func (r *NodeRecovery) getNodeDeviceNameFromPV(pod *v1.Pod) (*nodeDevice, error) {
+// getNodeDeviceNameFromPV returns a struct that contain the node and the PV used by the OSD pod
+func (r *NodeRecovery) getNodeDeviceNameFromPV(pod *v1.Pod) (*odfv1alpha1.NodePV, error) {
 	if pvcName, ok := pod.Labels[osd.OSDOverPVCLabelKey]; ok {
 		pvc := &v1.PersistentVolumeClaim{}
 		err := r.Get(r.ctx, types.NamespacedName{Namespace: pod.Namespace, Name: pvcName}, pvc, &client.GetOptions{})
@@ -526,46 +539,24 @@ func (r *NodeRecovery) getNodeDeviceNameFromPV(pod *v1.Pod) (*nodeDevice, error)
 		if err != nil {
 			return nil, err
 		}
-		if dn, ok := pv.Annotations[localv1.PVDeviceNameLabel]; ok {
-			return &nodeDevice{nodeName: pvc.Labels[v1.LabelHostname], deviceName: dn}, nil
-		}
-		return nil, fmt.Errorf("annotation %s not found in PV %s", localv1.PVDeviceNameLabel, pv.Name)
+		return &odfv1alpha1.NodePV{NodeName: pv.Labels[v1.LabelHostname], PersistentVolumeName: pv.Name}, nil
 	}
 	return nil, nil
 }
 
-//   - name: Perm delete osd's
-//     shell: "oc process -n openshift-storage ocs-osd-removal -p FAILED_OSD_IDS={{ osds | join(',') }} |oc create -n openshift-storage -f -"
-//     when: 'crash_pods.stdout_lines | length > 0'
-//     retries: 30
-//     delay: 10
-//
-
-// extractOSDIds returns a slice that contains the values of the label `osd.OsdIdLabelKey` in the pods.
-func extractOSDIds(pods []v1.Pod) []string {
-	ids := []string{}
-	for _, p := range pods {
-		ids = append(ids, p.Labels[osd.OsdIdLabelKey])
-	}
-	return ids
-}
-
-// proceessOCSOSDRemovalTemplate
-//  - name: Perm delete osd's
-//       shell: "oc process -n openshift-storage ocs-osd-removal -p FAILED_OSD_IDS={{ osds | join(',') }} |oc create -n openshift-storage -f -"
-//       when: 'crash_pods.stdout_lines | length > 0'
-//       retries: 30
-//       delay: 10
-
-func (r *NodeRecovery) processOCSOSDRemovalTemplate(crashingPods []v1.Pod) error {
-	ids := extractOSDIds(crashingPods)
+// processOCSOSDRemovalTemplate triggers the processing of the OSD removal job template and its job. It accepts
+// a list of the OSD IDs to be removed and whether to force the removal or not. These parameters are then passed
+// to the template for processing.
+func (r *NodeRecovery) processOCSOSDRemovalTemplate(ids []string, forceOSDRemovalParam bool) error {
 	t := &templatev1.Template{}
-	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: OCS_OSD_REMOVAL}, t)
+	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: OCS_OSD_REMOVAL_JOB}, t)
 	if err != nil {
 		return err
 	}
-	param := templateprocessing.GetParameterByName(t, FAILED_OSD_IDS)
-	param.Value = strings.Join(ids, ",")
+	failedOSDIDs := templateprocessing.GetParameterByName(t, FAILED_OSD_IDS)
+	failedOSDIDs.Value = strings.Join(ids, ",")
+	forcedRemoval := templateprocessing.GetParameterByName(t, FORCE_OSD_REMOVAL)
+	forcedRemoval.Value = strconv.FormatBool(forceOSDRemovalParam)
 	processor := templateprocessing.NewProcessor(map[string]generator.Generator{
 		"expression": generator.NewExpressionValueGenerator(rand.New(rand.NewSource(time.Now().UnixNano()))),
 	})
@@ -589,6 +580,9 @@ func (r *NodeRecovery) processOCSOSDRemovalTemplate(crashingPods []v1.Pod) error
 		if cobj, ok = objToCreate.(client.Object); !ok {
 			return fmt.Errorf("failed to cast as client.Object: %v", objToCreate)
 		}
+		// Add namespace because it's stripped from the template at processing time
+		// https://github.com/openshift/library-go/blob/144cb72bbb3903cd74ce307dc0688ce37b45b97e/pkg/template/templateprocessing/template.go#L86-L90
+		cobj.SetNamespace(ODF_NAMESPACE)
 		if err := r.Create(r.ctx, cobj, &client.CreateOptions{}); err != nil {
 			return err
 		}
@@ -596,14 +590,7 @@ func (r *NodeRecovery) processOCSOSDRemovalTemplate(crashingPods []v1.Pod) error
 	return nil
 }
 
-// getOSDRemovalPodCompletionStatus
-//   - name: Check osd removal job completion
-//     shell: "oc get pod -l job-name=ocs-osd-removal-job -n openshift-storage --field-selector=status.phase==\"Succeeded\" -o name"
-//     register: result
-//     until: 'result.stdout_lines | length > 0'
-//     when: 'crash_pods.stdout_lines | length > 0'
-//     retries: 30
-//     delay: 10
+// getOSDRemovalPodCompletionStatus retrieves the OSD removal job pod
 func (r *NodeRecovery) getOSDRemovalPodJobCompletionStatus() (*v1.Pod, error) {
 	pods := &v1.PodList{}
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
@@ -626,15 +613,8 @@ func (r *NodeRecovery) getOSDRemovalPodJobCompletionStatus() (*v1.Pod, error) {
 	return nil, fmt.Errorf("failed to retrieve the status of the ODF removal job pod in %s: no pod found or all pod instances are being deleted", ODF_NAMESPACE)
 }
 
-// restartStorageOperator
-//   - name: Restart storage operator
-//     shell: "oc delete pod -n openshift-storage -l app=rook-ceph-operator"
-//     register: result
-//     when: (crash_pods.stdout_lines | length > 0) or (pending_pods.stdout_lines | length > 0)
-//     until: result.rc == 0
-//     retries: 30
-//     delay: 10
-func (r *NodeRecovery) restartStorageOperator() error {
+// deleteRookCephOperatorPod deletes the rook ceph operator pod instance
+func (r *NodeRecovery) deleteRookCephOperatorPod() error {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{Key: "app", Operator: metav1.LabelSelectorOpIn, Values: []string{"rook-ceph-operator"}},
@@ -646,12 +626,62 @@ func (r *NodeRecovery) restartStorageOperator() error {
 	return r.DeleteAllOf(r.ctx, &v1.Pod{}, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: selector}})
 }
 
+// getPodLogs retrieves the logs of a pod in the openshift-storage namespace
+func (r *NodeRecovery) getPodLogs(podName string) (string, error) {
+	podLogOpts := v1.PodLogOptions{}
+	clientset := kubernetes.NewForConfigOrDie(r.Config)
+	req := clientset.CoreV1().Pods(ODF_NAMESPACE).GetLogs(podName, &podLogOpts)
+	podLogs, err := req.Stream(r.ctx)
+	if err != nil {
+		return "", fmt.Errorf("error in opening stream: %s", err)
+	}
+	defer podLogs.Close()
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		return "", fmt.Errorf("error in copy information from podLogs to buffer: %s", err)
+	}
+	return buf.String(), nil
+}
+
+// deletePV deletes a PV from the cluster specified by the pvName parameter
+func (r *NodeRecovery) deletePV(pvName string) error {
+	pv := &v1.PersistentVolume{}
+	err := r.Get(r.ctx, types.NamespacedName{Name: pvName}, pv, &client.GetOptions{})
+	if err != nil {
+		if !kerrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+	return r.Delete(r.ctx, pv, &client.DeleteOptions{})
+}
+
+// validateJobLogs checks the logs of the OSD removal job to ensure that the logs show
+// a successful run
+func (r *NodeRecovery) validateJobLogs(podName string) error {
+	logs, err := r.getPodLogs(podName)
+	if err != nil {
+		return err
+	}
+	logs = strings.TrimSpace(logs) // remove empty last l
+	slogs := strings.Split(logs, "\n")
+	if s := strings.ToLower(slogs[len(slogs)-1]); !strings.Contains(s, osdJobSuccessMessage) {
+		r.log.Error(fmt.Errorf("osd job removal completed with failure"), slogs[len(slogs)-1])
+		return fmt.Errorf("osd job removal completed with failure: %s", slogs[len(slogs)-1])
+	}
+	return nil
+}
+
+// getLatestCondition returns the latest condition
 func getLatestCondition(instance *odfv1alpha1.NodeRecovery) *odfv1alpha1.RecoveryCondition {
 	latest := &instance.Status.Conditions[len(instance.Status.Conditions)-1]
 	latest.LastProbeTime = metav1.Now()
 	return latest
 }
 
+// transitionNextCondition adds the new condition to the slice and flags the current one as false so that the CLI command
+// shows the newly added condition as the current
 func transitionNextCondition(instance *odfv1alpha1.NodeRecovery, nextCondition odfv1alpha1.RecoveryConditionType) {
 	instance.Status.Conditions[len(instance.Status.Conditions)-1].Status = odfv1alpha1.StatusFalse
 	instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: nextCondition, LastTransitionTime: metav1.Now(), LastProbeTime: metav1.Now(), Status: odfv1alpha1.StatusTrue})

@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"time"
+
 	version "github.com/hashicorp/go-version"
 )
 
@@ -8,10 +10,17 @@ const (
 	ODF_NAMESPACE                  = "openshift-storage"
 	podStateReasonCrashLoopBackOff = "CrashLoopBackOff"
 	FAILED_OSD_IDS                 = "FAILED_OSD_IDS"
+	FORCE_OSD_REMOVAL              = "FORCE_OSD_REMOVAL"
 	HEALTH_OK                      = "HEALTH_OK"
-	OCS_OSD_REMOVAL                = "ocs-osd-removal"
+	OCS_OSD_REMOVAL_JOB            = "ocs-osd-removal"
 
+	reconciliationTimeout = 30 * time.Minute
+	osdRemovalJobTimeout  = 10 * time.Minute
+
+	disableForcedOSDRemoval     = false
+	enableForcedOSDRemoval      = true
 	podStatusPhaseFieldSelector = ".status.phase"
+	osdJobSuccessMessage        = "completed removal"
 )
 
 type RecoveryReason string

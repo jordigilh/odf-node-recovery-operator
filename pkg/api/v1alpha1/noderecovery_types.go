@@ -27,16 +27,19 @@ type RecoveryConditionType string
 type RecoveryConditionReason string
 
 var (
-	EnableCephToolsPod           RecoveryConditionType = "EnableCephToolsPod"
-	WaitForCephToolsPodRunning   RecoveryConditionType = "WaitForCephToolsPodRunning"
-	WaitForOSDPodsStabilize      RecoveryConditionType = "WaitForOSDPodsStabilize"
-	LabelNodesWithPendingPods    RecoveryConditionType = "LabelNodesWithPendingPods"
-	ManageCrashLoopBackOffPods   RecoveryConditionType = "ManageCrashLoopBackOffPods"
-	CleanupOSDRemovalJob         RecoveryConditionType = "CleanupOSDRemovalJob"
-	RestartStorageOperator       RecoveryConditionType = "RestartStorageOperator"
-	DeleteFailedPodsNodeAffinity RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
-	StorageClusterFitnessCheck   RecoveryConditionType = "StorageClusterFitnessCheck"
-	DisableCephTools             RecoveryConditionType = "DisableCephTools"
+	EnableCephToolsPod             RecoveryConditionType = "EnableCephToolsPod"
+	WaitForCephToolsPodRunning     RecoveryConditionType = "WaitForCephToolsPodRunning"
+	WaitForOSDPodsStabilize        RecoveryConditionType = "WaitForOSDPodsStabilize"
+	LabelNodesWithPendingPods      RecoveryConditionType = "LabelNodesWithPendingPods"
+	ManageCrashLoopBackOffPods     RecoveryConditionType = "ManageCrashLoopBackOffPods"
+	ForceDeleteRookCephOSDPods     RecoveryConditionType = "ForceDeleteRookCephOSDPods"
+	CleanupOSDRemovalJob           RecoveryConditionType = "CleanupOSDRemovalJob"
+	RetryForceCleanupOSDRemovalJob RecoveryConditionType = "RetryForceCleanupOSDRemovalJob"
+	DeletePersistentVolume         RecoveryConditionType = "DeletePersistentVolume"
+	RestartStorageOperator         RecoveryConditionType = "RestartStorageOperator"
+	DeleteFailedPodsNodeAffinity   RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
+	StorageClusterFitnessCheck     RecoveryConditionType = "StorageClusterFitnessCheck"
+	DisableCephTools               RecoveryConditionType = "DisableCephTools"
 
 	RunningPhase   RecoveryPhase = "Running"
 	FailedPhase    RecoveryPhase = "Failed"
@@ -115,6 +118,17 @@ type NodeRecoveryStatus struct {
 	//CrashLoopBackOffPods captures whether there were OSD pods in CrashLoopBackOff when reconciling the CR. This value is used by the reconciler along with the `PendingPods` to determine
 	// if the reconciliation requires a restart the ODF operator.
 	CrashLoopBackOffPods bool `json:"crashLoopBackOffPods,omitempty"`
+
+	//NodeDevice contains a list of node name and device name pair used by the reconciliation to track which nodes and devices have failed based on the OSD pods that are in CrashLoopbackOff
+	NodeDevice []NodePV `json:"nodeDevice,omitempty"`
+
+	// CrashedOSDDeploymentIDs contains a list of the OSD IDs that match the ceph osd pods that are in CrashLoopbackOff status. This value is used during the reconciliation loop to cleanup the
+	// pods that are not being removed when the deployment is scaled down to 0
+	CrashedOSDDeploymentIDs []string `json:"osdIDs,omitempty"`
+
+	// ForcedOSDRemoval indicates if the reconciliation of the CR required to trigger the OSD Removal job with the ForcedOSDRemoval flag as true or false. If true it means the initial attempt to run the job timed out after 10 minutes
+	// and the reconciliation loop triggered a second job with the flag set to true to ensure success.
+	ForcedOSDRemoval bool `json:"forcedOSDRemoval,omitempty"`
 }
 
 // NodeRecovery is the Schema for the noderecoveries API
@@ -140,6 +154,11 @@ type NodeRecoveryList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NodeRecovery `json:"items"`
+}
+
+type NodePV struct {
+	NodeName             string `json:"nodeName"`
+	PersistentVolumeName string `json:"pvName"`
 }
 
 func init() {

@@ -805,7 +805,7 @@ func newTemplate() *templatev1.Template {
   "kind": "Template",
   "apiVersion": "template.openshift.io/v1",
   "metadata": {
-    "name": "`+OCS_OSD_REMOVAL+`",
+    "name": "`+OCS_OSD_REMOVAL_JOB+`",
     "namespace": "`+ODF_NAMESPACE+`"
   },
   "objects": [

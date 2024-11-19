@@ -10,6 +10,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	policyapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 const IMAGE_PULLSPEC = "registry.redhat.io/rhel8/support-tools"
@@ -93,7 +94,15 @@ func (c *Runner) deployNodeRunnerPod(namespaceName, nodeName string) (*v1.Pod, e
 							Name:      "host-root",
 						},
 					},
-					// Command: []string{"chroot", "/host", "sgdisk", "--zap-all", "/dev/" + deviceName},
+					Command:   []string{"/bin/sh"},
+					Env:       []v1.EnvVar{{Name: "TMOUT", Value: "900"}},
+					TTY:       true,
+					Stdin:     true,
+					StdinOnce: true,
+					SecurityContext: &v1.SecurityContext{
+						RunAsUser:  ptr.To[int64](0),
+						Privileged: ptr.To[bool](true),
+					},
 				},
 			},
 			HostIPC:       true,

@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
+
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -22,10 +22,10 @@ type RemoteCommandExecutor interface {
 }
 
 type remoteExecutor struct {
-	*rest.Config
+	*restclient.Config
 }
 
-func NewRemoteExecutor(config *rest.Config) RemoteCommandExecutor {
+func NewRemoteExecutor(config *restclient.Config) RemoteCommandExecutor {
 
 	return &remoteExecutor{Config: config}
 }
@@ -51,12 +51,11 @@ func (r *remoteExecutor) Run(pod *v1.Pod, cmd []string) ([]byte, []byte, error) 
 		Param("container", containerName)
 
 	request.VersionedParams(&v1.PodExecOptions{
-		Container: containerName,
-		Command:   cmd,
-		Stdin:     false,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       true,
+		Command: cmd,
+		Stdin:   false,
+		Stdout:  true,
+		Stderr:  true,
+		TTY:     true,
 	}, scheme.ParameterCodec)
 	exec, err := createExecutor(request.URL(), r.Config)
 	// exec, err := remotecommand.NewSPDYExecutor(r.Config, "POST", request.URL())

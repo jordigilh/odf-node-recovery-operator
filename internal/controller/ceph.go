@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
+	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -51,16 +51,16 @@ func (r *NodeRecovery) getCephHealthStatus() (string, error) {
 	return h.Health.Status, nil
 }
 
-// scaleRookCephOSDDeploymentsToZero scales all deployment objects that match the label `app=rook-ceph-osd` to zero
+// scaleRookCephOSDDeploymentToZero scales the deployment object that match the label `app=rook-ceph-osd` and `ceph-osd-id={osdID} to zero
 //   - name: Scale to 0
 //     shell: "oc scale -n openshift-storage deployment rook-ceph-osd-{{ item | regex_search('rook-ceph-osd-([0-9]+)', '\\1') | first }} --replicas=0"
 //     with_items: "{{ crash_pods.stdout_lines }}"
 //     when: 'crash_pods.stdout_lines | length > 0'
 //     retries: 30
 //     delay: 10
-func (r *NodeRecovery) scaleRookCephOSDDeploymentsToZero() error {
+func (r *NodeRecovery) scaleRookCephOSDDeploymentToZero(osdID string) error {
 	l := &appsv1.DeploymentList{}
-	selectorMap := map[string]string{"app": "rook-ceph-osd"}
+	selectorMap := map[string]string{"app": "rook-ceph-osd", osd.OsdIdLabelKey: osdID}
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
 	if err != nil {
 		return err
@@ -79,28 +79,6 @@ func (r *NodeRecovery) scaleRookCephOSDDeploymentsToZero() error {
 	return nil
 }
 
-// forceDeleteRookCephOSDPods forces deleting the pods belonging to the Rook Ceph OSD deployments that are stuck and unable to delete after scaling their deployments to zero
-// - name: Check if osd pod is still running
-//   shell: "oc get -n openshift-storage pods -l ceph-osd-id={{ item | regex_search('rook-ceph-osd-([0-9]+)', '\\1') | first }} -o custom-columns=name:metadata.name --no-headers"
-//   register: result
-//   with_items: "{{ crash_pods.stdout_lines }}"
-//   when: 'crash_pods.stdout_lines | length > 0'
-//   retries: 30
-//   delay: 10
-
-func (r *NodeRecovery) getRookCephOSDPods() (*v1.PodList, error) {
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "ceph-osd-id", Operator: metav1.LabelSelectorOpExists},
-		}},
-	)
-	if err != nil {
-		return nil, err
-	}
-	l := &v1.PodList{}
-	return l, r.List(r.ctx, l, &client.ListOptions{LabelSelector: selector})
-}
-
 //   - name: Force delete if still running
 //     shell: "oc delete -n openshift-storage pod {{ item.stdout }} --grace-period=0 --force"
 //     with_items: "{{ result.results }}"
@@ -108,10 +86,10 @@ func (r *NodeRecovery) getRookCephOSDPods() (*v1.PodList, error) {
 //     ignore_errors: true
 //     retries: 30
 //     delay: 10
-func (r *NodeRecovery) forceDeleteRookCephOSDPods() error {
+func (r *NodeRecovery) forceDeleteRookCephOSDPods(osdIDs []string) error {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "ceph-osd-id", Operator: metav1.LabelSelectorOpExists},
+			{Key: osd.OsdIdLabelKey, Operator: metav1.LabelSelectorOpIn, Values: osdIDs},
 		}},
 	)
 	if err != nil {
@@ -124,36 +102,7 @@ func (r *NodeRecovery) forceDeleteRookCephOSDPods() error {
 		})
 }
 
-// eraseDevices wipes out the devices associated to the PVs used by the crashing pods
-//   - name: Erase devices before adding to OCS cluster
-//     shell: "oc debug node/{{ item.name }} --image=registry.redhat.io/rhel8/support-tools -- chroot /host sgdisk --zap-all /dev/{{ item.device }}"
-//     register: osd_pods_devices_sgdisk
-//     until: osd_pods_devices_sgdisk.rc == 0
-//     with_items: "{{ sgdisk }}"
-//     retries: 30
-//     delay: 10
-func (r *NodeRecovery) eraseDevice(nd *nodeDevice) error {
-	runner := pod.NewRunner(r.Config, r.log)
-	pod, cleanup, err := runner.Initialize(nd.nodeName)
-	if err != nil {
-		return err
-	}
-	defer cleanup()
-	stdOut, stdErr, err := r.cmdRunner.Run(pod, []string{"chroot", "/host", "sgdisk", "--zap-all", "/dev/" + nd.deviceName})
-	if err != nil {
-		return fmt.Errorf("failed to erase disk %s in node %s:%v", nd.deviceName, nd.nodeName, err)
-	}
-	r.log.V(6).Info("stdout", string(stdOut), "stderr", stdErr)
-	return nil
-}
-
-// deleteOldOSDRemovalJob
-//   - name: Delete old osd removal job
-//     shell: "oc delete -n openshift-storage job ocs-osd-removal-job"
-//     ignore_errors: true
-//     when: 'crash_pods.stdout_lines | length > 0'
-//     retries: 30
-//     delay: 10
+// deleteOldOSDRemovalJob deletes any existing job named osd-removal-job in the openshift-storage
 func (r *NodeRecovery) deleteOldOSDRemovalJob() error {
 	job := &batchv1.Job{}
 	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocs-osd-removal-job"}, job, &client.GetOptions{})
@@ -166,6 +115,7 @@ func (r *NodeRecovery) deleteOldOSDRemovalJob() error {
 	return r.Delete(r.ctx, job, &client.DeleteOptions{})
 }
 
+// getRunningCephToolsPod returns the pod associated to the rook ceph tools instance
 func (r *NodeRecovery) getRunningCephToolsPod() (*v1.Pod, error) {
 	ctx := r.ctx
 	l := &v1.PodList{}
@@ -184,13 +134,8 @@ func (r *NodeRecovery) getRunningCephToolsPod() (*v1.Pod, error) {
 	return &l.Items[0], nil
 }
 
-// archiveCephDaemonCrashMessages
-//   - name: Archive any ceph daemon crash messages
-//     shell: "oc rsh -n openshift-storage {{ TOOLS_POD }} ceph crash archive-all"
-//     register: result
-//     until: result.rc == 0
-//     retries: 30
-//     delay: 10
+// archiveCephDaemonCrashMessages runs a ceph command in the ceph tools pod to archive any generated crash report
+// so that the cluster can reach HEALTH_OK status
 func (r *NodeRecovery) archiveCephDaemonCrashMessages() error {
 	cmd := []string{"ceph", "crash", "archive-all"}
 	pod, err := r.getRunningCephToolsPod()
@@ -256,4 +201,32 @@ func (r *NodeRecovery) getCephToolsPodPhase() (v1.PodPhase, error) {
 		return "", err
 	}
 	return pod.Status.Phase, nil
+}
+
+func (r *NodeRecovery) getOSDPods() (*v1.PodList, error) {
+	pods := v1.PodList{}
+	selectorMap := map[string]string{"app": "rook-ceph-osd"}
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
+	if err != nil {
+		return nil, err
+	}
+	err = r.List(r.ctx, &pods, &client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: selector})
+	if err != nil {
+		return nil, err
+	}
+	return &pods, nil
+}
+
+func (r *NodeRecovery) getOSDPodsWithID(osdID string) (*v1.PodList, error) {
+	pods := v1.PodList{}
+	selectorMap := map[string]string{"app": "rook-ceph-osd", osd.OsdIdLabelKey: osdID}
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
+	if err != nil {
+		return nil, err
+	}
+	err = r.List(r.ctx, &pods, &client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: selector})
+	if err != nil {
+		return nil, err
+	}
+	return &pods, nil
 }
