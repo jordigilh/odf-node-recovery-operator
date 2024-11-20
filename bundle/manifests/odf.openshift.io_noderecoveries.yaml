@@ -112,19 +112,24 @@ spec:
                   CrashLoopBackOffPods captures whether there were OSD pods in CrashLoopBackOff when reconciling the CR. This value is used by the reconciler along with the `PendingPods` to determine
                   if the reconciliation requires a restart the ODF operator.
                 type: boolean
+              forcedOSDRemoval:
+                description: |-
+                  ForcedOSDRemoval indicates if the reconciliation of the CR required to trigger the OSD Removal job with the ForcedOSDRemoval flag as true or false. If true it means the initial attempt to run the job timed out after 10 minutes
+                  and the reconciliation loop triggered a second job with the flag set to true to ensure success.
+                type: boolean
               nodeDevice:
                 description: NodeDevice contains a list of node name and device name
                   pair used by the reconciliation to track which nodes and devices
                   have failed based on the OSD pods that are in CrashLoopbackOff
                 items:
                   properties:
-                    deviceName:
-                      type: string
                     nodeName:
                       type: string
+                    pvName:
+                      type: string
                   required:
-                  - deviceName
                   - nodeName
+                  - pvName
                   type: object
                 type: array
               osdIDs:
