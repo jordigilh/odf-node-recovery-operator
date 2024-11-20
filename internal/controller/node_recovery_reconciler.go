@@ -61,23 +61,33 @@ import (
 type NodeRecovery struct {
 	client.Client
 	*rest.Config
-	Scheme    *runtime.Scheme
-	ctx       context.Context
-	cmdRunner pod.RemoteCommandExecutor
-	recorder  record.EventRecorder
-	log       logr.Logger
+	Scheme       *runtime.Scheme
+	ctx          context.Context
+	cmdRunner    pod.RemoteCommandExecutor
+	recorder     record.EventRecorder
+	log          logr.Logger
+	logRetriever podLogRetriever
 }
 
-func newNodeRecoveryReconciler(ctx context.Context, log logr.Logger, client client.Client, restConfig *rest.Config, scheme *runtime.Scheme, recorder record.EventRecorder, cmdRunner pod.RemoteCommandExecutor) (*NodeRecovery, error) {
+func newNodeRecoveryReconciler(
+	ctx context.Context,
+	log logr.Logger,
+	client client.Client,
+	restConfig *rest.Config,
+	scheme *runtime.Scheme,
+	recorder record.EventRecorder,
+	cmdRunner pod.RemoteCommandExecutor,
+	logRetriever podLogRetriever) (*NodeRecovery, error) {
 
 	return &NodeRecovery{
-		Client:    client,
-		Config:    restConfig,
-		ctx:       ctx,
-		Scheme:    scheme,
-		recorder:  recorder,
-		cmdRunner: cmdRunner,
-		log:       log,
+		Client:       client,
+		Config:       restConfig,
+		ctx:          ctx,
+		Scheme:       scheme,
+		recorder:     recorder,
+		cmdRunner:    cmdRunner,
+		log:          log,
+		logRetriever: logRetriever,
 	}, nil
 }
 
@@ -203,7 +213,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				return ctrl.Result{}, err
 			}
 			if len(pods.Items) > 0 {
-				if time.Now().After(pods.Items[0].DeletionTimestamp.Add(time.Minute)) {
+				if time.Now().Before(pods.Items[0].DeletionTimestamp.Add(time.Minute)) {
 					return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 				}
 			}
@@ -626,12 +636,23 @@ func (r *NodeRecovery) deleteRookCephOperatorPod() error {
 	return r.DeleteAllOf(r.ctx, &v1.Pod{}, &client.DeleteAllOfOptions{ListOptions: client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: selector}})
 }
 
+type podLogRetriever interface {
+	GetLogs(podName string) (string, error)
+}
+
+type LogClient struct {
+	clientset *kubernetes.Clientset
+}
+
+func NewLogRetriever(config *rest.Config) podLogRetriever {
+	return &LogClient{clientset: kubernetes.NewForConfigOrDie(config)}
+}
+
 // getPodLogs retrieves the logs of a pod in the openshift-storage namespace
-func (r *NodeRecovery) getPodLogs(podName string) (string, error) {
+func (l *LogClient) GetLogs(podName string) (string, error) {
 	podLogOpts := v1.PodLogOptions{}
-	clientset := kubernetes.NewForConfigOrDie(r.Config)
-	req := clientset.CoreV1().Pods(ODF_NAMESPACE).GetLogs(podName, &podLogOpts)
-	podLogs, err := req.Stream(r.ctx)
+	req := l.clientset.CoreV1().Pods(ODF_NAMESPACE).GetLogs(podName, &podLogOpts)
+	podLogs, err := req.Stream(context.TODO())
 	if err != nil {
 		return "", fmt.Errorf("error in opening stream: %s", err)
 	}
@@ -660,7 +681,7 @@ func (r *NodeRecovery) deletePV(pvName string) error {
 // validateJobLogs checks the logs of the OSD removal job to ensure that the logs show
 // a successful run
 func (r *NodeRecovery) validateJobLogs(podName string) error {
-	logs, err := r.getPodLogs(podName)
+	logs, err := r.logRetriever.GetLogs(podName)
 	if err != nil {
 		return err
 	}

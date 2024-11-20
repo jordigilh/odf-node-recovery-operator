@@ -142,6 +142,7 @@ func main() {
 		Scheme:    scheme,
 		Recorder:  mgr.GetEventRecorderFor("odf-node-recovery-controller"),
 		CmdRunner: pod.NewRemoteExecutor(config),
+		LogClient: controller.NewLogRetriever(config),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NodeRecovery")
 		os.Exit(1)

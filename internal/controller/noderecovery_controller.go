@@ -44,6 +44,7 @@ type NodeRecoveryReconciler struct {
 	Scheme    *runtime.Scheme
 	Recorder  record.EventRecorder
 	CmdRunner pod.RemoteCommandExecutor
+	LogClient podLogRetriever
 }
 
 // Node Recovery
@@ -106,7 +107,7 @@ func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		instance.Status.Phase = odfv1alpha1.RunningPhase
 		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, LastTransitionTime: metav1.Now(), Status: odfv1alpha1.StatusTrue})
 	}
-	recoverer, err := newNodeRecoveryReconciler(ctx, log, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner)
+	recoverer, err := newNodeRecoveryReconciler(ctx, log, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner, r.LogClient)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
