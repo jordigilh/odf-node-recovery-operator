@@ -23,13 +23,13 @@ metadata:
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
     containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
-    createdAt: "2024-12-05T21:42:25Z"
+    createdAt: "2024-12-09T15:16:44Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device replaced
     operators.operatorframework.io/builder: operator-sdk-v1.37.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v0.0.1
+  name: odf-node-recovery-operator.v0.0.2
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -218,7 +218,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
+                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -306,4 +306,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 0.0.1
+  version: 0.0.2
