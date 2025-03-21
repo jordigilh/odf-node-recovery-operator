@@ -408,14 +408,24 @@ func (r *NodeRecovery) hasPodsInCreatingOrInitializingState() (error, error) {
 	}
 	var errs error
 	for _, pod := range pods.Items {
-		for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
-			if status.State.Waiting != nil &&
-				((status.State.Waiting.Reason == kubelet.ContainerCreating) || (status.State.Waiting.Reason == kubelet.PodInitializing)) {
-				errs = errors.Join(errs, fmt.Errorf("pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
+		errs = errors.Join(errs, r.checkPodStatus(pod))
+	}
+	return errs, nil
+}
+
+func (r *NodeRecovery) checkPodStatus(pod v1.Pod) error {
+	var podErrors error
+	for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+		if status.State.Waiting != nil {
+			if status.State.Waiting.Reason == podStateReasonCrashLoopBackOff {
+				return nil
+			}
+			if (status.State.Waiting.Reason == kubelet.ContainerCreating) || (status.State.Waiting.Reason == kubelet.PodInitializing) {
+				podErrors = errors.Join(podErrors, fmt.Errorf("pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
 			}
 		}
 	}
-	return errs, nil
+	return podErrors
 }
 
 // getStorageCluster returns the StorageCluster object instance named "ocs-storagecluster". This object
