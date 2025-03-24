@@ -101,7 +101,7 @@ func (c *Runner) deployNodeRunnerPod(namespaceName, nodeName string) (*v1.Pod, e
 					StdinOnce: true,
 					SecurityContext: &v1.SecurityContext{
 						RunAsUser:  ptr.To[int64](0),
-						Privileged: ptr.To[bool](true),
+						Privileged: ptr.To(true),
 					},
 				},
 			},

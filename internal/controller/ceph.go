@@ -103,16 +103,16 @@ func (r *NodeRecovery) forceDeleteRookCephOSDPods(osdIDs []string) error {
 }
 
 // deleteOldOSDRemovalJob deletes any existing job named osd-removal-job in the openshift-storage
-func (r *NodeRecovery) deleteOldOSDRemovalJob() error {
+func (r *NodeRecovery) deleteOldOSDRemovalJob() (bool, error) {
 	job := &batchv1.Job{}
 	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocs-osd-removal-job"}, job, &client.GetOptions{})
 	if err != nil {
 		if kerrors.IsNotFound(err) {
-			return nil
+			return false, nil
 		}
-		return err
+		return false, err
 	}
-	return r.Delete(r.ctx, job, &client.DeleteOptions{})
+	return true, r.Delete(r.ctx, job, &client.DeleteOptions{})
 }
 
 // getRunningCephToolsPod returns the pod associated to the rook ceph tools instance
