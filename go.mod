@@ -270,7 +270,6 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.6
 	k8s.io/mount-utils => k8s.io/mount-utils v0.31.6
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.6
-
 	sigs.k8s.io/sig-storage-local-static-provisioner => sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20250130044123-3e55e7a25121
 )
 

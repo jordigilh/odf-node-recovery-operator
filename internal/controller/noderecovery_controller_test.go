@@ -105,7 +105,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(o.Spec.EnableCephTools).To(BeTrue())
 		})
 
-		It("Validating the condition in the status is waiting for the ceph tool to be running", func() {
+		It("Validates the condition in the status is waiting for the ceph tool to be running", func() {
 			init := newOCSInit(enabledCephTools)
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForCephToolsPodRunning)
 			p := &corev1.Pod{
@@ -135,7 +135,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			validateConditions(nodeRecovery, 1, v1alpha1.WaitForCephToolsPodRunning, v1alpha1.PodNotInRunningPhase)
 		})
-		It("Validating the condition of the OSD pods to stabilize", func() {
+		It("Validates the condition of the OSD pods to stabilize", func() {
 			init := newOCSInit(enabledCephTools)
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForCephToolsPodRunning)
 			By("Creating the Ceph Tools pod in running phase")
@@ -167,7 +167,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.WaitForOSDPodsStabilize, "")
 		})
 
-		It("Validating the condition of the OSD pods to stabilize", func() {
+		It("Validates the condition of the OSD pods to stabilize", func() {
 			init := newOCSInit(enabledCephTools)
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForOSDPodsStabilize)
 
@@ -224,7 +224,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 1, v1alpha1.WaitForOSDPodsStabilize, v1alpha1.WaitingForPodsToInitialize)
 		})
 
-		It("Validating the transition from waiting for OSD pods to initialize to checking for pods in pending status", func() {
+		It("Validates the transition from waiting for OSD pods to initialize to checking for pods in pending status", func() {
 			By("Creating the CR")
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForOSDPodsStabilize)
 			By("Creating a pod in pending phase")
@@ -268,7 +268,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.LabelNodesWithPendingPods, "")
 			Expect(nodeRecovery.Status.PendingPods).To(BeFalse())
 		})
-		It("Validating the transition from label nodes with pending pods pods to Manage crashloopbackoff pods", func() {
+		It("Validates the transition from label nodes with pending pods pods to Manage crashloopbackoff pods", func() {
 			By("Creating the CR")
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.LabelNodesWithPendingPods)
 			By("Creating a pod in pending phase")
@@ -316,7 +316,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(n.Labels).To(BeEquivalentTo(map[string]string{defaults.NodeAffinityKey: ""}))
 		})
 
-		It("Validating the condition of managing pods in crashloopbackoff status", func() {
+		It("Validates the condition of managing pods in crashloopbackoff status", func() {
 			By("Creating the CR")
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ManageCrashLoopBackOffPods)
@@ -406,7 +406,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.ForceDeleteRookCephOSDPods, "")
 		})
 
-		It("Validating the condition where no pods are in CrashBackLookBackOff", func() {
+		It("Validates the condition where no pods are in CrashBackLookBackOff", func() {
 			By("Creating the CR")
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ManageCrashLoopBackOffPods)
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery).Build()
@@ -431,7 +431,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.RestartStorageOperator, "")
 		})
 
-		It("Validating the condition where force deleting the OSD pods through the OSD removal job when there are >3 OSD instances", func() {
+		It("Validates the condition where force deleting the OSD pods through the OSD removal job when there are >3 OSD instances", func() {
 			By("Creating the CR")
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ForceDeleteRookCephOSDPods)
@@ -558,7 +558,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.ProcessOCSRemovalTemplate, "")
 		})
 
-		It("Validating the condition after successfully deleting the OSD pods and processing the OSD Removal Template", func() {
+		It("Validates the condition after successfully deleting the OSD pods and processing the OSD Removal Template", func() {
 			By("Creating the CR")
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
@@ -595,7 +595,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.CleanupOSDRemovalJob, "")
 		})
 
-		It("Validating the condition where force deleting the OSD pods through the OSD removal job when there are 3 OSD instances", func() {
+		It("Validates the condition where force deleting the OSD pods through the OSD removal job when there are 3 OSD instances", func() {
 			By("Creating the CR")
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
@@ -632,7 +632,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.CleanupOSDRemovalJob, "")
 		})
 
-		It("Validating the condition of cleaning up the osd removal job status when job times out", func() {
+		It("Validates the condition of cleaning up the osd removal job status when job times out", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 			nodeRecovery.Status.Conditions[0].LastTransitionTime = metav1.Time{Time: time.Now().Add(-osdRemovalJobTimeout)}
@@ -674,7 +674,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.RetryForceCleanupOSDRemovalJob, "")
 		})
 
-		It("Validating the condition of force cleaning up the osd removal job status when it times out ", func() {
+		It("Validates the condition of force cleaning up the osd removal job status when it times out ", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.RetryForceCleanupOSDRemovalJob)
 			nodeRecovery.Status.Conditions[0].LastTransitionTime = metav1.Time{Time: time.Now().Add(-osdRemovalJobTimeout)}
@@ -716,7 +716,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 1, v1alpha1.RetryForceCleanupOSDRemovalJob, "")
 		})
 
-		It("Validating the condition of force cleaning up the osd removal job status when it completes with success", func() {
+		It("Validates the condition of force cleaning up the osd removal job status when it completes with success", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.RetryForceCleanupOSDRemovalJob)
 			By("Creating the osd-removal-job pod in running phase")
 			p1 := &corev1.Pod{
@@ -755,7 +755,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.WaitForPersistenVolumeBound, "")
 		})
 
-		It("Validating the condition of cleaning up the osd removal job status when not yet succeeded", func() {
+		It("Validates the condition of cleaning up the osd removal job status when not yet succeeded", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 
 			By("Creating the osd-removal-job pod in running phase")
@@ -794,7 +794,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 1, v1alpha1.CleanupOSDRemovalJob, "")
 		})
 
-		It("Validating the condition of cleaning up the osd removal job status when succeeded but pod logs show failure", func() {
+		It("Validates the condition of cleaning up the osd removal job status when succeeded but pod logs show failure", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 			By("Validating the osd-removal-job pod in succeeded phase")
 			p1 := &corev1.Pod{
@@ -845,7 +845,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(kerrors.IsNotFound(err)).NotTo(BeTrue())
 		})
 
-		It("Validating the condition of cleaning up the osd removal job status when succeeded and pod logs show success and the job pod is not found", func() {
+		It("Validates the condition of cleaning up the osd removal job status when succeeded and pod logs show success and the job pod is not found", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 			By("Validating the osd-removal-job pod in succeeded phase")
 			p1 := &corev1.Pod{
@@ -896,10 +896,9 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("Validating the condition of deleting the failed PV", func() {
-
+		It("Validates the condition of deleting the failed PV", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
-			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName"}}
+			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
 			By("Creating the PV ")
 			pv := &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -907,6 +906,54 @@ var _ = Describe("NodeRecovery Controller", func() {
 					Annotations: map[string]string{
 						localv1.PVDeviceNameLabel: "vdb",
 					},
+					Labels: map[string]string{
+						"kubernetes.io/hostname": "foo",
+					},
+				},
+				Status: corev1.PersistentVolumeStatus{
+					Phase: corev1.VolumeReleased,
+				},
+			}
+
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, pv).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling the created resource")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Validating the response")
+			Expect(resp.RequeueAfter).To(Equal(15 * time.Second))
+
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			validateConditions(nodeRecovery, 1, v1alpha1.WaitForPersistenVolumeBound, "")
+		})
+
+		It("Validates the condition of PV bound after being released", func() {
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
+			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
+			By("Creating the PV ")
+			pv := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvName",
+					Annotations: map[string]string{
+						localv1.PVDeviceNameLabel: "vdb",
+					},
+					Labels: map[string]string{
+						"kubernetes.io/hostname": "foo",
+					},
+				},
+				Status: corev1.PersistentVolumeStatus{
+					Phase: corev1.VolumeBound,
 				},
 			}
 
@@ -931,12 +978,9 @@ var _ = Describe("NodeRecovery Controller", func() {
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
 			validateConditions(nodeRecovery, 2, v1alpha1.RestartStorageOperator, "")
-			By("Validating the osd-removal-job pod has been deleted")
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: pv.Name}, pv)
-			Expect(kerrors.IsNotFound(err)).To(BeTrue())
 		})
 
-		It("Validating the condition of restarting the storage operator when pending pods were found", func() {
+		It("Validates the condition of restarting the storage operator when pending pods were found", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.RestartStorageOperator)
 			nodeRecovery.Status.PendingPods = true
 			By("Creating a storage operator pod")
@@ -964,7 +1008,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Validating the response")
-			Expect(resp.Requeue).To(BeTrue())
+			Expect(resp.RequeueAfter).To(Equal(30 * time.Second))
 
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
@@ -972,7 +1016,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.DeleteFailedPodsNodeAffinity, "")
 		})
 
-		It("Validating the condition of restarting the storage operator when pods with crashloopbackoff status were found", func() {
+		It("Validates the condition of restarting the storage operator when pods with crashloopbackoff status were found", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.RestartStorageOperator)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
 
@@ -1002,7 +1046,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Validating the response")
-			Expect(resp.Requeue).To(BeTrue())
+			Expect(resp.RequeueAfter).To(Equal(30 * time.Second))
 
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
@@ -1010,7 +1054,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.DeleteFailedPodsNodeAffinity, "")
 		})
 
-		It("Validating the condition of deleting the failed pods due to node affinity", func() {
+		It("Validates the condition of deleting the failed pods due to node affinity", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.DeleteFailedPodsNodeAffinity)
 
 			init := newOCSInit(enabledCephTools)
@@ -1057,10 +1101,50 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
+			validateConditions(nodeRecovery, 2, v1alpha1.ArchiveCephDaemonCrashMessages, "")
+		})
+
+		It("Validates the condition of archieving the ceph daemon crash messages", func() {
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ArchiveCephDaemonCrashMessages)
+
+			init := newOCSInit(enabledCephTools)
+
+			By("Creating a the ceph tools pod")
+
+			tools := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "storage-operator",
+					Namespace: "openshift-storage",
+					Labels: map[string]string{
+						"app": "rook-ceph-tools",
+					},
+				},
+			}
+
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(init, nodeRecovery, tools).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling the CR")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Validating the response")
+			Expect(resp.Requeue).To(BeTrue())
+
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
 			validateConditions(nodeRecovery, 2, v1alpha1.StorageClusterFitnessCheck, "")
 		})
 
-		It("Validating the condition of storage cluster fitness check", func() {
+		It("Validates the condition of storage cluster fitness check", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.StorageClusterFitnessCheck)
 			init := newOCSInit(enabledCephTools)
 			By("Creating a storage operator pod")
@@ -1096,7 +1180,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.DisableCephTools, "")
 		})
 
-		It("Validating the condition of disabling the ceph tools pod", func() {
+		It("Validates the condition of disabling the ceph tools pod", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.DisableCephTools)
 			init := newOCSInit(enabledCephTools)
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, init).Build()

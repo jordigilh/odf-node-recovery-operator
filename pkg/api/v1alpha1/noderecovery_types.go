@@ -36,7 +36,6 @@ var (
 	ProcessOCSRemovalTemplate      RecoveryConditionType = "ProcessOCSRemovalTemplate"
 	CleanupOSDRemovalJob           RecoveryConditionType = "CleanupOSDRemovalJob"
 	RetryForceCleanupOSDRemovalJob RecoveryConditionType = "RetryForceCleanupOSDRemovalJob"
-	// DeletePersistentVolume         RecoveryConditionType = "DeletePersistentVolume"
 	WaitForPersistenVolumeBound    RecoveryConditionType = "WaitForPersistenVolumeBound"
 	RestartStorageOperator         RecoveryConditionType = "RestartStorageOperator"
 	DeleteFailedPodsNodeAffinity   RecoveryConditionType = "DeleteFailedPodsNodeAffinity"

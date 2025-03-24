@@ -335,13 +335,15 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		for _, nd := range instance.Status.NodeDevice {
 			pvs, err := r.getPVsForNode(nd.NodeName)
 			if err != nil {
-				return ctrl.Result{}, errs
+				return ctrl.Result{}, err
 			}
 			errs = errors.Join(r.processPVForNode(nd.NodeName, pvs.Items))
 		}
 		if errs != nil {
 			latestCondition.Message = errs.Error()
-			return ctrl.Result{}, errs
+			// No need to return the error since the purpose is to requeue the event
+			// because the PVs are not yet reconciled.
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 		return ctrl.Result{Requeue: true}, nil
