@@ -105,6 +105,37 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(o.Spec.EnableCephTools).To(BeTrue())
 		})
 
+		It("should flag the KeepCephToolsPod as true when the pod already exists", func() {
+			init := newOCSInit(enabledCephTools)
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(init, getNodeRecovery()).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			By("Validating the response")
+			Expect(resp.RequeueAfter).To(Equal(10 * time.Second))
+			By("Validating the CR status")
+			nodeRecovery = &v1alpha1.NodeRecovery{}
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeRecovery.Status.StartTime.Time.IsZero()).NotTo(BeTrue())
+			Expect(nodeRecovery.Status.CompletionTime).To(BeNil())
+			Expect(nodeRecovery.Status.KeepCephToolsPod).To(BeTrue())
+			validateConditions(nodeRecovery, 2, v1alpha1.WaitForCephToolsPodRunning, "")
+			By("Validating the ocsinit object has the EnableCephTools set to true")
+			o := &ocsoperatorv1.OCSInitialization{}
+			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: init.Name, Namespace: init.Namespace}, o)).NotTo(HaveOccurred())
+			Expect(o.Spec.EnableCephTools).To(BeTrue())
+		})
+
 		It("Validates the condition in the status is waiting for the ceph tool to be running", func() {
 			init := newOCSInit(enabledCephTools)
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForCephToolsPodRunning)
@@ -1180,9 +1211,37 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 2, v1alpha1.DisableCephTools, "")
 		})
 
-		It("Validates the condition of disabling the ceph tools pod", func() {
+		It("Validates the condition of disabling the ceph tools pod when it was initially found disabled", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.DisableCephTools)
 			init := newOCSInit(enabledCephTools)
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, init).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling the CR")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+			By("Validating the response")
+			Expect(resp).To(Equal(reconcile.Result{}))
+
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeRecovery.Status.Phase).To(Equal(v1alpha1.CompletedPhase))
+			Expect(nodeRecovery.Status.CompletionTime.Time.IsZero()).To(BeFalse())
+			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
+		})
+
+		It("Validates the condition of disabling the ceph tools pod when it was initially found enabled", func() {
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.DisableCephTools)
+			init := newOCSInit(enabledCephTools)
+			nodeRecovery.Status.KeepCephToolsPod = true
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, init).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
