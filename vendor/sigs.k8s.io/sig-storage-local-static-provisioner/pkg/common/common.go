@@ -36,13 +36,14 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	volumeUtil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/mount"
 )
 
@@ -106,6 +107,8 @@ type UserConfig struct {
 	Namespace string
 	// JobContainerImage of container to use for jobs (optional)
 	JobContainerImage string
+	// JobTolerations defines the tolerations to apply to jobs (optional)
+	JobTolerations []v1.Toleration
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors
 	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
 	MinResyncPeriod metav1.Duration
@@ -129,6 +132,9 @@ type MountConfig struct {
 	// The volume mode of created PersistentVolume object,
 	// default to Filesystem if not specified.
 	VolumeMode string `json:"volumeMode" yaml:"volumeMode"`
+	// The access mode of created PersistentVolume object
+	// default to ReadWriteOnce if not specified.
+	AccessMode string `json:"accessMode" yaml:"accessMode"`
 	// Filesystem type to mount.
 	// It applies only when the source path is a block device,
 	// and desire volume mode is Filesystem.
@@ -137,6 +143,9 @@ type MountConfig struct {
 	// NamePattern name pattern check
 	// only discover file name matching pattern("*" by default)
 	NamePattern string `json:"namePattern" yaml:"namePattern"`
+	// Additional selector terms to set for node affinity in addition to the provisioner node name.
+	// Useful for shared disks as affinity can not be changed after provisioning the PV.
+	Selector []v1.NodeSelectorTerm `json:"selector" yaml:"selector"`
 }
 
 // RuntimeConfig stores all the objects that the provisioner needs to run
@@ -174,6 +183,7 @@ type LocalPVConfig struct {
 	AffinityAnn     string
 	NodeAffinity    *v1.VolumeNodeAffinity
 	VolumeMode      v1.PersistentVolumeMode
+	AccessMode      v1.PersistentVolumeAccessMode
 	MountOptions    []string
 	FsType          *string
 	Labels          map[string]string
@@ -203,6 +213,9 @@ type ProvisionerConfiguration struct {
 	// default is false.
 	// +optional
 	UseJobForCleaning bool `json:"useJobForCleaning" yaml:"useJobForCleaning"`
+	// JobTolerations defines the tolerations to apply to jobs
+	// +optional
+	JobTolerations []v1.Toleration `json:"jobTolerations" yaml:"jobTolerations"`
 	// MinResyncPeriod is minimum resync period. Resync period in reflectors
 	// will be random between MinResyncPeriod and 2*MinResyncPeriod.
 	MinResyncPeriod metav1.Duration `json:"minResyncPeriod" yaml:"minResyncPeriod"`
@@ -239,12 +252,16 @@ func CreateLocalPVSpec(config *LocalPVConfig) *v1.PersistentVolume {
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
+				config.AccessMode,
 			},
 			StorageClassName: config.StorageClass,
 			VolumeMode:       &config.VolumeMode,
 			MountOptions:     config.MountOptions,
 		},
+	}
+
+	if config.AccessMode == "" {
+		pv.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}
 	}
 
 	if config.UseAlphaAPI {
@@ -395,6 +412,7 @@ func UserConfigFromProvisionerConfig(node *v1.Node, namespace, jobImage string, 
 		UseNodeNameOnly:   config.UseNodeNameOnly,
 		Namespace:         namespace,
 		JobContainerImage: jobImage,
+		JobTolerations:    config.JobTolerations,
 		LabelsForPV:       config.LabelsForPV,
 		SetPVOwnerRef:     config.SetPVOwnerRef,
 	}
@@ -487,34 +505,25 @@ func GetVolumeMode(volUtil util.VolumeUtil, fullPath string) (v1.PersistentVolum
 	return "", fmt.Errorf("Block device check for %q failed: %s", fullPath, errblk)
 }
 
-// NodeExists checks to see if a Node exists in the Indexer of a NodeLister.
-func NodeExists(nodeLister corelisters.NodeLister, nodeName string) (bool, error) {
-	_, err := nodeLister.Get(nodeName)
-	if errors.IsNotFound(err) {
-		return false, nil
+// AnyNodeExists checks to see if a Node exists in the Indexer of a NodeLister.
+// If this fails, it uses the well known label `kubernetes.io/hostname` to find the Node.
+// It aborts early if an unexpected error occurs and it's uncertain if a node would exist or not.
+func AnyNodeExists(nodeLister corelisters.NodeLister, nodeNames []string) bool {
+	for _, nodeName := range nodeNames {
+		_, err := nodeLister.Get(nodeName)
+		if err == nil || !errors.IsNotFound(err) {
+			return true
+		}
+		req, err := labels.NewRequirement(NodeLabelKey, selection.Equals, []string{nodeName})
+		if err != nil {
+			return true
+		}
+		nodes, err := nodeLister.List(labels.NewSelector().Add(*req))
+		if err != nil || len(nodes) > 0 {
+			return true
+		}
 	}
-	return err == nil, err
-}
-
-// NodeAttachedToLocalPV gets the name of the Node that a local PV has a NodeAffinity to.
-// It assumes that there should be only one matching Node for a local PV and that
-// the local PV follows the form:
-//
-//	nodeAffinity:
-//	  required:
-//	    nodeSelectorTerms:
-//	    - matchExpressions:
-//	      - key: kubernetes.io/hostname
-//	        operator: In
-//	        values:
-//	        - <node1>
-func NodeAttachedToLocalPV(pv *v1.PersistentVolume) (string, bool) {
-	nodeNames := volumeUtil.GetLocalPersistentVolumeNodeNames(pv)
-	// We assume that there should only be one matching node.
-	if nodeNames == nil || len(nodeNames) != 1 {
-		return "", false
-	}
-	return nodeNames[0], true
+	return false
 }
 
 // IsLocalPVWithStorageClass checks that a PV is a local PV that belongs to any of the passed in StorageClasses.

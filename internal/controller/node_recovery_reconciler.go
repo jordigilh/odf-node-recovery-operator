@@ -120,6 +120,8 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				latestCondition.Message = err.Error()
 				return ctrl.Result{}, err
 			}
+		} else {
+			instance.Status.KeepCephToolsPod = true
 		}
 		transitionNextCondition(instance, odfv1alpha1.WaitForCephToolsPodRunning)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
@@ -333,13 +335,15 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		for _, nd := range instance.Status.NodeDevice {
 			pvs, err := r.getPVsForNode(nd.NodeName)
 			if err != nil {
-				return ctrl.Result{}, errs
+				return ctrl.Result{}, err
 			}
 			errs = errors.Join(r.processPVForNode(nd.NodeName, pvs.Items))
 		}
 		if errs != nil {
 			latestCondition.Message = errs.Error()
-			return ctrl.Result{}, errs
+			// No need to return the error since the purpose is to requeue the event
+			// because the PVs are not yet reconciled.
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 		return ctrl.Result{Requeue: true}, nil
@@ -390,12 +394,14 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		transitionNextCondition(instance, odfv1alpha1.DisableCephTools)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.DisableCephTools:
-		err := r.disableCephTools()
-		if err != nil {
-			r.log.Error(err, "failed to disable Ceph tools")
-			latestCondition.Reason = odfv1alpha1.FailedDisableCephToolsPod
-			latestCondition.Message = err.Error()
-			return ctrl.Result{}, err
+		if !instance.Status.KeepCephToolsPod {
+			err := r.disableCephTools()
+			if err != nil {
+				r.log.Error(err, "failed to disable Ceph tools")
+				latestCondition.Reason = odfv1alpha1.FailedDisableCephToolsPod
+				latestCondition.Message = err.Error()
+				return ctrl.Result{}, err
+			}
 		}
 	}
 	instance.Status.Phase = odfv1alpha1.CompletedPhase

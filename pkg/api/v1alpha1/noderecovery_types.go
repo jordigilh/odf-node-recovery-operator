@@ -36,7 +36,6 @@ var (
 	ProcessOCSRemovalTemplate      RecoveryConditionType = "ProcessOCSRemovalTemplate"
 	CleanupOSDRemovalJob           RecoveryConditionType = "CleanupOSDRemovalJob"
 	RetryForceCleanupOSDRemovalJob RecoveryConditionType = "RetryForceCleanupOSDRemovalJob"
-	// DeletePersistentVolume         RecoveryConditionType = "DeletePersistentVolume"
 	WaitForPersistenVolumeBound    RecoveryConditionType = "WaitForPersistenVolumeBound"
 	RestartStorageOperator         RecoveryConditionType = "RestartStorageOperator"
 	DeleteFailedPodsNodeAffinity   RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
@@ -132,6 +131,10 @@ type NodeRecoveryStatus struct {
 	// ForcedOSDRemoval indicates if the reconciliation of the CR required to trigger the OSD Removal job with the ForcedOSDRemoval flag as true or false. If true it means the initial attempt to run the job timed out after 10 minutes
 	// and the reconciliation loop triggered a second job with the flag set to true to ensure success.
 	ForcedOSDRemoval bool `json:"forcedOSDRemoval,omitempty"`
+
+	// KeepCephToolsPod indicates if the reconciliation shall delete the CephTools pod after completing the reconciliation flow. By default it will remove the pod unless it detects
+	// the pod exists prior to starting the reconciilation
+	KeepCephToolsPod bool `json:"keepCephToolsPod,omitempty"`
 }
 
 // NodeRecovery is the Schema for the noderecoveries API
