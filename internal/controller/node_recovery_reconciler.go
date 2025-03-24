@@ -120,6 +120,8 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				latestCondition.Message = err.Error()
 				return ctrl.Result{}, err
 			}
+		} else {
+			instance.Status.KeepCephToolsPod = true
 		}
 		transitionNextCondition(instance, odfv1alpha1.WaitForCephToolsPodRunning)
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
@@ -390,12 +392,14 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		transitionNextCondition(instance, odfv1alpha1.DisableCephTools)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.DisableCephTools:
-		err := r.disableCephTools()
-		if err != nil {
-			r.log.Error(err, "failed to disable Ceph tools")
-			latestCondition.Reason = odfv1alpha1.FailedDisableCephToolsPod
-			latestCondition.Message = err.Error()
-			return ctrl.Result{}, err
+		if !instance.Status.KeepCephToolsPod {
+			err := r.disableCephTools()
+			if err != nil {
+				r.log.Error(err, "failed to disable Ceph tools")
+				latestCondition.Reason = odfv1alpha1.FailedDisableCephToolsPod
+				latestCondition.Message = err.Error()
+				return ctrl.Result{}, err
+			}
 		}
 	}
 	instance.Status.Phase = odfv1alpha1.CompletedPhase

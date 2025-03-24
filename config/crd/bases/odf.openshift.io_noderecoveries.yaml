@@ -117,6 +117,11 @@ spec:
                   ForcedOSDRemoval indicates if the reconciliation of the CR required to trigger the OSD Removal job with the ForcedOSDRemoval flag as true or false. If true it means the initial attempt to run the job timed out after 10 minutes
                   and the reconciliation loop triggered a second job with the flag set to true to ensure success.
                 type: boolean
+              keepCephToolsPod:
+                description: |-
+                  KeepCephToolsPod indicates if the reconciliation shall delete the CephTools pod after completing the reconciliation flow. By default it will remove the pod unless it detects
+                  the pod exists prior to starting the reconciilation
+                type: boolean
               nodeDevice:
                 description: NodeDevice contains a list of node name and device name
                   pair used by the reconciliation to track which nodes and devices
