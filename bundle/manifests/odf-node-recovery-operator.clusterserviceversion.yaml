@@ -23,13 +23,13 @@ metadata:
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
     containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
-    createdAt: "2025-03-24T18:38:32Z"
+    createdAt: "2025-03-24T22:19:32Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device or a node replaced
     operators.operatorframework.io/builder: operator-sdk-v1.39.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v0.0.4
+  name: odf-node-recovery-operator.v0.0.5-rc1
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -103,8 +103,10 @@ spec:
           resources:
           - jobs
           verbs:
+          - create
           - delete
           - get
+          - list
         - apiGroups:
           - config.openshift.io
           resources:
@@ -197,7 +199,7 @@ spec:
                 - --upstream=http://127.0.0.1:8080/
                 - --logtostderr=true
                 - --v=0
-                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+                image: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9@sha256:29201e85bd41642b72c7c0ce915e40aad90823d0efc3e7bbab9c351c92c74341
                 name: kube-rbac-proxy
                 ports:
                 - containerPort: 8443
@@ -221,7 +223,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.4
+                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.5-rc1
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -309,4 +311,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 0.0.4
+  version: 0.0.5-rc1
