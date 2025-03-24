@@ -1,6 +1,8 @@
 module github.com/jordigilh/odf-node-recovery-operator
 
-go 1.22.7
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/hashicorp/go-version v1.7.0
@@ -17,7 +19,6 @@ require (
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	sigs.k8s.io/controller-runtime v0.19.0
-
 )
 
 require github.com/rook/rook/pkg/apis v0.0.0-20241001184150-fd3927bc8400 // indirect
@@ -205,15 +206,15 @@ require (
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
-	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/term v0.24.0 // indirect
-	golang.org/x/text v0.19.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
 	golang.org/x/tools v0.25.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
@@ -249,13 +250,18 @@ require (
 	sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20240328032358-4f81db77908f // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 	sigs.k8s.io/yaml v1.4.0 // indirect
-
 )
 
 replace (
+	// CVE GHSA-mh63-6h87-95cp
+	github.com/golang-jwt/jwt/v5 => github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/libopenstorage/secrets => github.com/rook/secrets v0.0.0-20240315053144-3195f6906937
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3 // required by rook
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful => go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
+	// CVE GHSA-v778-237x-gjrc
+	golang.org/x/crypto => golang.org/x/crypto v0.31.0
+	// CVE GHSA-qxp5-gwg8-xv66
+	golang.org/x/net => golang.org/x/net v0.36.0
 	k8s.io/client-go => k8s.io/client-go v0.31.1
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.31.1
 	k8s.io/cri-client => k8s.io/cri-client v0.31.1
