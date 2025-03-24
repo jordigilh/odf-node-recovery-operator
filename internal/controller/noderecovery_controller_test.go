@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	templatev1 "github.com/openshift/api/template/v1"
@@ -99,8 +98,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeRecovery.Status.StartTime.Time.IsZero()).NotTo(BeTrue())
 			Expect(nodeRecovery.Status.CompletionTime).To(BeNil())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.WaitForCephToolsPodRunning))
+			validateConditions(nodeRecovery, 2, v1alpha1.WaitForCephToolsPodRunning, "")
 			By("Validating the ocsinit object has the EnableCephTools set to true")
 			o := &ocsoperatorv1.OCSInitialization{}
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{Name: init.Name, Namespace: init.Namespace}, o)).NotTo(HaveOccurred())
@@ -135,9 +133,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.WaitForCephToolsPodRunning))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(Equal(v1alpha1.PodNotInRunningPhase))
+			validateConditions(nodeRecovery, 1, v1alpha1.WaitForCephToolsPodRunning, v1alpha1.PodNotInRunningPhase)
 		})
 		It("Validating the condition of the OSD pods to stabilize", func() {
 			init := newOCSInit(enabledCephTools)
@@ -168,8 +164,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.WaitForOSDPodsStabilize))
+			validateConditions(nodeRecovery, 2, v1alpha1.WaitForOSDPodsStabilize, "")
 		})
 
 		It("Validating the condition of the OSD pods to stabilize", func() {
@@ -226,9 +221,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.WaitForOSDPodsStabilize))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(Equal(v1alpha1.WaitingForPodsToInitialize))
+			validateConditions(nodeRecovery, 1, v1alpha1.WaitForOSDPodsStabilize, v1alpha1.WaitingForPodsToInitialize)
 		})
 
 		It("Validating the transition from waiting for OSD pods to initialize to checking for pods in pending status", func() {
@@ -272,10 +265,8 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
+			validateConditions(nodeRecovery, 2, v1alpha1.LabelNodesWithPendingPods, "")
 			Expect(nodeRecovery.Status.PendingPods).To(BeFalse())
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.LabelNodesWithPendingPods))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
 		})
 		It("Validating the transition from label nodes with pending pods pods to Manage crashloopbackoff pods", func() {
 			By("Creating the CR")
@@ -318,10 +309,8 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
 			Expect(nodeRecovery.Status.PendingPods).To(BeTrue())
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.ManageCrashLoopBackOffPods))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.ManageCrashLoopBackOffPods, "")
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: n.Name}, n)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(n.Labels).To(BeEquivalentTo(map[string]string{defaults.NodeAffinityKey: ""}))
@@ -413,10 +402,8 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
 			Expect(nodeRecovery.Status.CrashLoopBackOffPods).To(BeTrue())
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.ForceDeleteRookCephOSDPods))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.ForceDeleteRookCephOSDPods, "")
 		})
 
 		It("Validating the condition where no pods are in CrashBackLookBackOff", func() {
@@ -441,9 +428,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.RestartStorageOperator))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.RestartStorageOperator, "")
 		})
 
 		It("Validating the condition where force deleting the OSD pods through the OSD removal job when there are >3 OSD instances", func() {
@@ -473,56 +458,9 @@ var _ = Describe("NodeRecovery Controller", func() {
 				},
 			}
 
-			p2 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pv-pod-2",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "2",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{}}}},
-				},
-			}
-
-			p3 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pv-pod-3",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "3",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{}}}},
-				},
-			}
-
-			p4 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pv-pod-4",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "4",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{}}}},
-				},
-			}
+			p2 := generateOSDPodObject("2")
+			p3 := generateOSDPodObject("3")
+			p4 := generateOSDPodObject("4")
 
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -582,129 +520,51 @@ var _ = Describe("NodeRecovery Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("Validating the response")
-			Expect(resp.RequeueAfter).To(Equal(10 * time.Second))
+			Expect(resp.Requeue).To(BeTrue())
 
-			By("Validating the arguments in the template")
-			cm := &corev1.ConfigMap{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: "noderec-configmap", Namespace: ODF_NAMESPACE}, cm)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cm.Data[FAILED_OSD_IDS]).To(Equal("1"))
-			Expect(cm.Data[FORCE_OSD_REMOVAL]).To(Equal("false"))
-
-			By("Validating the CR status")
-			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
 			Expect(nodeRecovery.Status.CrashLoopBackOffPods).To(BeTrue())
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.CleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 1, v1alpha1.ForceDeleteRookCephOSDPods, "")
+
 		})
 
-		It("Validating the condition where force deleting the OSD pods through the OSD removal job when there are 3 OSD instances", func() {
+		It("Validates the condition in force delete the OSD pods when there are none left and it transitions to the next phase", func() {
 			By("Creating the CR")
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ForceDeleteRookCephOSDPods)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
 			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
-			By("Creating OSD pods and PV/PVCs in crashloopback status")
-			p1 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					DeletionTimestamp: &metav1.Time{Time: time.Now().Add(-2 * time.Minute)},
-					Finalizers:        []string{"foo"},
-					Name:              "pv-pod-1",
-					Namespace:         "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "1",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Waiting: &corev1.ContainerStateWaiting{
-								Reason: "CrashLoopBackOff"}}}},
-				},
+
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
 			}
 
-			p2 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pv-pod-2",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "2",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{}}}},
-				},
-			}
+			By("Reconciling the created resource")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
 
-			p3 := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pv-pod-3",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						osd.OSDOverPVCLabelKey: "pvcName",
-						"app":                  "rook-ceph-osd",
-						osd.OsdIdLabelKey:      "3",
-					},
-				},
-				Status: corev1.PodStatus{
-					InitContainerStatuses: []corev1.ContainerStatus{
-						{State: corev1.ContainerState{
-							Running: &corev1.ContainerStateRunning{}}}},
-				},
-			}
+			By("Validating the response")
+			Expect(resp.Requeue).To(BeTrue())
 
-			pvc := &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pvcName",
-					Namespace: "openshift-storage",
-					Labels:    map[string]string{corev1.LabelHostname: "foo"},
-				},
-				Spec: corev1.PersistentVolumeClaimSpec{
-					VolumeName: "pvName",
-				},
-			}
-			pv := &corev1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pvName",
-					Annotations: map[string]string{
-						localv1.PVDeviceNameLabel: "vdb",
-					},
-				},
-			}
-			By("Creating Ceph OSD Deployments")
-			d := &appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "deployment",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						"app": "rook-ceph-osd",
-					},
-				},
-				Spec: appsv1.DeploymentSpec{
-					Replicas: ptr.To(int32(1)),
-				},
-			}
-			By("Creating pods with ceph-osd-id label")
-			osdPod := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "ceph-osd-id",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						"ceph-osd-id": "1",
-					},
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-					Finalizers:        []string{"foo"},
-				},
-			}
-			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template, d, p1, p2, p3, osdPod, pv, pvc).Build()
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeRecovery.Status.CrashLoopBackOffPods).To(BeTrue())
+			validateConditions(nodeRecovery, 2, v1alpha1.ProcessOCSRemovalTemplate, "")
+		})
+
+		It("Validating the condition after successfully deleting the OSD pods and processing the OSD Removal Template", func() {
+			By("Creating the CR")
+			template := newTemplate()
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
+			nodeRecovery.Status.CrashLoopBackOffPods = true
+			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
 				Client:    k8sClient,
@@ -731,10 +591,45 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
 			Expect(nodeRecovery.Status.CrashLoopBackOffPods).To(BeTrue())
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.CleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.CleanupOSDRemovalJob, "")
+		})
+
+		It("Validating the condition where force deleting the OSD pods through the OSD removal job when there are 3 OSD instances", func() {
+			By("Creating the CR")
+			template := newTemplate()
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
+			nodeRecovery.Status.CrashLoopBackOffPods = true
+			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling the created resource")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Validating the response")
+			Expect(resp.RequeueAfter).To(Equal(10 * time.Second))
+
+			By("Validating the arguments in the template")
+			cm := &corev1.ConfigMap{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: "noderec-configmap", Namespace: ODF_NAMESPACE}, cm)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cm.Data[FAILED_OSD_IDS]).To(Equal("1"))
+			Expect(cm.Data[FORCE_OSD_REMOVAL]).To(Equal("true"))
+
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeRecovery.Status.CrashLoopBackOffPods).To(BeTrue())
+			validateConditions(nodeRecovery, 2, v1alpha1.CleanupOSDRemovalJob, "")
 		})
 
 		It("Validating the condition of cleaning up the osd removal job status when job times out", func() {
@@ -775,10 +670,8 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.RetryForceCleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
 			Expect(nodeRecovery.Status.ForcedOSDRemoval).To(BeTrue())
+			validateConditions(nodeRecovery, 2, v1alpha1.RetryForceCleanupOSDRemovalJob, "")
 		})
 
 		It("Validating the condition of force cleaning up the osd removal job status when it times out ", func() {
@@ -819,10 +712,8 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.RetryForceCleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
-			Expect(nodeRecovery.Status.Phase).To(Equal(odfv1alpha1.FailedPhase))
+			Expect(nodeRecovery.Status.Phase).To(Equal(v1alpha1.FailedPhase))
+			validateConditions(nodeRecovery, 1, v1alpha1.RetryForceCleanupOSDRemovalJob, "")
 		})
 
 		It("Validating the condition of force cleaning up the osd removal job status when it completes with success", func() {
@@ -861,9 +752,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.DeletePersistentVolume))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.WaitForPersistenVolumeBound, "")
 		})
 
 		It("Validating the condition of cleaning up the osd removal job status when not yet succeeded", func() {
@@ -902,9 +791,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.CleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 1, v1alpha1.CleanupOSDRemovalJob, "")
 		})
 
 		It("Validating the condition of cleaning up the osd removal job status when succeeded but pod logs show failure", func() {
@@ -952,15 +839,13 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(1))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.CleanupOSDRemovalJob))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 1, v1alpha1.CleanupOSDRemovalJob, "")
 			By("Validating the osd-removal-job pod has been deleted")
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, job)
 			Expect(kerrors.IsNotFound(err)).NotTo(BeTrue())
 		})
 
-		It("Validating the condition of cleaning up the osd removal job status when succeeded and pod logs show success", func() {
+		It("Validating the condition of cleaning up the osd removal job status when succeeded and pod logs show success and the job pod is not found", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 			By("Validating the osd-removal-job pod in succeeded phase")
 			p1 := &corev1.Pod{
@@ -1005,9 +890,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.DeletePersistentVolume))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.WaitForPersistenVolumeBound, "")
 			By("Validating the osd-removal-job pod has been deleted")
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: job.Name}, job)
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
@@ -1015,7 +898,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 
 		It("Validating the condition of deleting the failed PV", func() {
 
-			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.DeletePersistentVolume)
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
 			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName"}}
 			By("Creating the PV ")
 			pv := &corev1.PersistentVolume{
@@ -1047,9 +930,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.RestartStorageOperator))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(BeEmpty())
+			validateConditions(nodeRecovery, 2, v1alpha1.RestartStorageOperator, "")
 			By("Validating the osd-removal-job pod has been deleted")
 			err = k8sClient.Get(ctx, types.NamespacedName{Name: pv.Name}, pv)
 			Expect(kerrors.IsNotFound(err)).To(BeTrue())
@@ -1088,8 +969,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.DeleteFailedPodsNodeAffinity))
+			validateConditions(nodeRecovery, 2, v1alpha1.DeleteFailedPodsNodeAffinity, "")
 		})
 
 		It("Validating the condition of restarting the storage operator when pods with crashloopbackoff status were found", func() {
@@ -1127,8 +1007,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.DeleteFailedPodsNodeAffinity))
+			validateConditions(nodeRecovery, 2, v1alpha1.DeleteFailedPodsNodeAffinity, "")
 		})
 
 		It("Validating the condition of deleting the failed pods due to node affinity", func() {
@@ -1178,8 +1057,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.StorageClusterFitnessCheck))
+			validateConditions(nodeRecovery, 2, v1alpha1.StorageClusterFitnessCheck, "")
 		})
 
 		It("Validating the condition of storage cluster fitness check", func() {
@@ -1215,8 +1093,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(nodeRecovery.Status.Conditions).To(HaveLen(2))
-			Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(v1alpha1.DisableCephTools))
+			validateConditions(nodeRecovery, 2, v1alpha1.DisableCephTools, "")
 		})
 
 		It("Validating the condition of disabling the ceph tools pod", func() {
@@ -1364,4 +1241,29 @@ func newTemplate() *templatev1.Template {
 }`), &template)
 	Expect(err).NotTo(HaveOccurred())
 	return &template
+}
+
+func generateOSDPodObject(id string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pv-pod-" + id,
+			Namespace: "openshift-storage",
+			Labels: map[string]string{
+				osd.OSDOverPVCLabelKey: "pvcName",
+				"app":                  "rook-ceph-osd",
+				osd.OsdIdLabelKey:      id,
+			},
+		},
+		Status: corev1.PodStatus{
+			InitContainerStatuses: []corev1.ContainerStatus{
+				{State: corev1.ContainerState{
+					Running: &corev1.ContainerStateRunning{}}}},
+		},
+	}
+}
+
+func validateConditions(nodeRecovery *v1alpha1.NodeRecovery, numConditions int, lastCondition v1alpha1.RecoveryConditionType, reason v1alpha1.RecoveryConditionReason) {
+	Expect(nodeRecovery.Status.Conditions).To(HaveLen(numConditions))
+	Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Type).To(Equal(lastCondition))
+	Expect(nodeRecovery.Status.Conditions[len(nodeRecovery.Status.Conditions)-1].Reason).To(Equal(reason))
 }

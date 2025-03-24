@@ -17,10 +17,11 @@ const (
 	reconciliationTimeout = 30 * time.Minute
 	osdRemovalJobTimeout  = 10 * time.Minute
 
-	disableForcedOSDRemoval     = false
-	enableForcedOSDRemoval      = true
-	podStatusPhaseFieldSelector = ".status.phase"
-	osdJobSuccessMessage        = "completed removal"
+	disableForcedOSDRemoval      = false
+	enableForcedOSDRemoval       = true
+	podStatusPhaseFieldSelector  = ".status.phase"
+	podDeletionTimestampSelector = ".metadata.deletionTimestamp"
+	osdJobSuccessMessage         = "completed removal"
 )
 
 type RecoveryReason string

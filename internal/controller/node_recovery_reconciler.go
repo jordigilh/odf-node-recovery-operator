@@ -207,6 +207,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 			return ctrl.Result{Requeue: true}, nil
 		}
+		var c int
 		for _, id := range instance.Status.CrashedOSDDeploymentIDs {
 			pods, err := r.getOSDPodsWithID(id)
 			if err != nil {
@@ -216,16 +217,30 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				if time.Now().Before(pods.Items[0].DeletionTimestamp.Add(time.Minute)) {
 					return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 				}
+				// pods have been in Terminating state for more than 1 minute. Add them to the count
+				// and when we exit the loop we will check if there have been pods terminating over a minute
+				// and force delete them.
+				c++
 			}
 		}
-		// pods have been deleting for over a minute, force delete them.
-		err := r.forceDeleteRookCephOSDPods(instance.Status.CrashedOSDDeploymentIDs)
+		if c > 0 {
+			// A total of 'c' pods have been in Terminating state for over a minute, force delete them and retry this phase
+			err := r.forceDeleteRookCephOSDPods(instance.Status.CrashedOSDDeploymentIDs)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+			transitionNextCondition(instance, odfv1alpha1.ForceDeleteRookCephOSDPods)
+		} else {
+			transitionNextCondition(instance, odfv1alpha1.ProcessOCSRemovalTemplate)
+		}
+		return ctrl.Result{Requeue: true}, nil
+	case odfv1alpha1.ProcessOCSRemovalTemplate:
+		found, err := r.deleteOldOSDRemovalJob()
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		err = r.deleteOldOSDRemovalJob()
-		if err != nil {
-			return ctrl.Result{}, err
+		if found {
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		osdPods, err := r.getOSDPods()
 		if err != nil {
@@ -252,10 +267,13 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			}
 			r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", osdRemovalJobTimeout.Minutes()), "timed out waiting for the OSD removal job to complete")
 			r.recorder.Eventf(instance, "Warning", "Reconciliation", fmt.Sprintf("OSD removal job timed out after %.f minutes. Retrying with %s=%t", osdRemovalJobTimeout.Minutes(), FORCE_OSD_REMOVAL, enableForcedOSDRemoval))
-			err = r.deleteOldOSDRemovalJob()
+			found, err := r.deleteOldOSDRemovalJob()
 			if err != nil {
 				r.log.Error(err, "failed to delete OSD removal jobs")
 				return ctrl.Result{}, err
+			}
+			if found {
+				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 			}
 			err = r.processOCSOSDRemovalTemplate(instance.Status.CrashedOSDDeploymentIDs, enableForcedOSDRemoval)
 			if err != nil {
@@ -270,12 +288,12 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.Phase = odfv1alpha1.FailedPhase
 			return ctrl.Result{}, err
 		}
-		err = r.deleteOldOSDRemovalJob()
+		_, err = r.deleteOldOSDRemovalJob()
 		if err != nil {
 			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
 		}
-		transitionNextCondition(instance, odfv1alpha1.DeletePersistentVolume)
+		transitionNextCondition(instance, odfv1alpha1.WaitForPersistenVolumeBound)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.RetryForceCleanupOSDRemovalJob:
 		pod, err := r.getOSDRemovalPodJobCompletionStatus()
@@ -299,20 +317,29 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.Phase = odfv1alpha1.FailedPhase
 			return ctrl.Result{}, err
 		}
-		err = r.deleteOldOSDRemovalJob()
+		found, err := r.deleteOldOSDRemovalJob()
 		if err != nil {
 			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
 		}
-		transitionNextCondition(instance, odfv1alpha1.DeletePersistentVolume)
+		if found {
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
+		transitionNextCondition(instance, odfv1alpha1.WaitForPersistenVolumeBound)
 		return ctrl.Result{Requeue: true}, nil
-	case odfv1alpha1.DeletePersistentVolume:
+
+	case odfv1alpha1.WaitForPersistenVolumeBound:
+		var errs error
 		for _, nd := range instance.Status.NodeDevice {
-			err := r.deletePV(nd.PersistentVolumeName)
+			pvs, err := r.getPVsForNode(nd.NodeName)
 			if err != nil {
-				r.log.Error(fmt.Errorf("failed to delete PV"), "pv", nd.PersistentVolumeName)
-				latestCondition.Message = fmt.Sprintf("failed to delete PV %s in node %s", nd.PersistentVolumeName, nd.NodeName)
+				return ctrl.Result{}, errs
 			}
+			errs = errors.Join(r.processPVForNode(nd.NodeName, pvs.Items))
+		}
+		if errs != nil {
+			latestCondition.Message = errs.Error()
+			return ctrl.Result{}, errs
 		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 		return ctrl.Result{Requeue: true}, nil
@@ -327,7 +354,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			}
 		}
 		transitionNextCondition(instance, odfv1alpha1.DeleteFailedPodsNodeAffinity)
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	case odfv1alpha1.DeleteFailedPodsNodeAffinity:
 		err := r.deleteFailedPodsWithReasonNodeAffinity()
 		if err != nil {
@@ -336,7 +363,10 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
-		err = r.archiveCephDaemonCrashMessages()
+		transitionNextCondition(instance, odfv1alpha1.ArchiveCephDaemonCrashMessages)
+		return ctrl.Result{Requeue: true}, nil
+	case odfv1alpha1.ArchiveCephDaemonCrashMessages:
+		err := r.archiveCephDaemonCrashMessages()
 		if err != nil {
 			r.log.Error(err, "failed to archive ceph daemon crash messages")
 			latestCondition.Reason = odfv1alpha1.FailedArchiveCephDaemonCrashMessages
@@ -408,14 +438,24 @@ func (r *NodeRecovery) hasPodsInCreatingOrInitializingState() (error, error) {
 	}
 	var errs error
 	for _, pod := range pods.Items {
-		for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
-			if status.State.Waiting != nil &&
-				((status.State.Waiting.Reason == kubelet.ContainerCreating) || (status.State.Waiting.Reason == kubelet.PodInitializing)) {
-				errs = errors.Join(errs, fmt.Errorf("pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
+		errs = errors.Join(errs, r.checkPodStatus(pod))
+	}
+	return errs, nil
+}
+
+func (r *NodeRecovery) checkPodStatus(pod v1.Pod) error {
+	var podErrors error
+	for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
+		if status.State.Waiting != nil {
+			if status.State.Waiting.Reason == podStateReasonCrashLoopBackOff {
+				return nil
+			}
+			if (status.State.Waiting.Reason == kubelet.ContainerCreating) || (status.State.Waiting.Reason == kubelet.PodInitializing) {
+				podErrors = errors.Join(podErrors, fmt.Errorf("pod %s: container %s waiting in %s: %s", pod.Name, status.Name, status.State.Waiting.Reason, status.State.Waiting.Message))
 			}
 		}
 	}
-	return errs, nil
+	return podErrors
 }
 
 // getStorageCluster returns the StorageCluster object instance named "ocs-storagecluster". This object
@@ -665,17 +705,48 @@ func (l *LogClient) GetLogs(podName string) (string, error) {
 	return buf.String(), nil
 }
 
-// deletePV deletes a PV from the cluster specified by the pvName parameter
-func (r *NodeRecovery) deletePV(pvName string) error {
-	pv := &v1.PersistentVolume{}
-	err := r.Get(r.ctx, types.NamespacedName{Name: pvName}, pv, &client.GetOptions{})
+func (r *NodeRecovery) getPVsForNode(nodeName string) (*v1.PersistentVolumeList, error) {
+	pvs := v1.PersistentVolumeList{}
+	selectorMap := map[string]string{"kubernetes.io/hostname": nodeName}
+	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: selectorMap})
 	if err != nil {
-		if !kerrors.IsNotFound(err) {
-			return err
-		}
-		return nil
+		return nil, err
 	}
-	return r.Delete(r.ctx, pv, &client.DeleteOptions{})
+	err = r.List(r.ctx, &pvs, &client.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, err
+	}
+	return &pvs, nil
+}
+
+// processPVForNode examines the PV associated to the failed node and performs the following operations:
+// * Delete the PV if it's in Release phase
+// * Flag as error if the PV is not in Bound phase, since it is the desired state
+// * Flag as error if the PV is being Terminated
+// * Flag as error if no PV is found for the node
+func (r *NodeRecovery) processPVForNode(nodeName string, pvs []v1.PersistentVolume) error {
+	var errs error
+	if len(pvs) == 0 {
+		errs = errors.Join(errs, fmt.Errorf("no PV found for host %s", nodeName))
+	}
+	for _, pv := range pvs {
+		if pv.Status.Phase == v1.VolumeReleased {
+			msg := fmt.Sprintf("volume %s in node %s is released and about to be deleted", pv.Name, nodeName)
+			err := r.Delete(r.ctx, &pv, &client.DeleteOptions{})
+			if err != nil {
+				msg = msg + ": " + err.Error()
+			}
+			errs = errors.Join(errs, errors.New(msg))
+			continue
+		}
+		if pv.Status.Phase != v1.VolumeBound {
+			errs = errors.Join(errs, fmt.Errorf("volume %s in node %s expected to be bound but found in phase %s", pv.Name, nodeName, pv.Status.Phase))
+		}
+		if !pv.DeletionTimestamp.IsZero() {
+			errs = errors.Join(errs, fmt.Errorf("volume %s in node %s is being deleted", pv.Name, nodeName))
+		}
+	}
+	return errs
 }
 
 // validateJobLogs checks the logs of the OSD removal job to ensure that the logs show
