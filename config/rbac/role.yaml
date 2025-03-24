@@ -57,8 +57,10 @@ rules:
   resources:
   - jobs
   verbs:
+  - create
   - delete
   - get
+  - list
 - apiGroups:
   - config.openshift.io
   resources:

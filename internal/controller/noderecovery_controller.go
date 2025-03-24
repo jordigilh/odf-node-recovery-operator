@@ -61,7 +61,7 @@ type NodeRecoveryReconciler struct {
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;watch;deletecollection
 //+kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;update;watch
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;delete
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;delete;list;create
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;update
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims;persistentvolumes,verbs=get;list;watch
 
