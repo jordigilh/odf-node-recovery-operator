@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/jordigilh/odf-node-recovery-controller
-  newTag: 0.0.4
+  newTag: 0.0.5-rc1
