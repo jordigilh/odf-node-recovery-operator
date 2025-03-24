@@ -9,11 +9,11 @@ require (
 	github.com/openshift/local-storage-operator v0.0.0-20240906102848-0008d0299d4c
 	github.com/red-hat-storage/ocs-operator v0.4.13
 	github.com/rook/rook v1.15.2
-	k8s.io/api v0.31.2
-	k8s.io/apimachinery v0.31.2
+	k8s.io/api v0.31.6
+	k8s.io/apimachinery v0.31.6
 	k8s.io/client-go v1.5.2
-	k8s.io/kubectl v0.31.1
-	k8s.io/kubernetes v1.31.1
+	k8s.io/kubectl v0.31.6
+	k8s.io/kubernetes v1.31.6
 	k8s.io/pod-security-admission v0.0.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 	sigs.k8s.io/controller-runtime v0.19.0
@@ -58,7 +58,7 @@ require (
 	github.com/sykesm/zap-logfmt v0.0.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.starlark.net v0.0.0-20231121155337-90ade8b19d09 // indirect
-	k8s.io/cli-runtime v0.31.2 // indirect
+	k8s.io/cli-runtime v0.31.6 // indirect
 	k8s.io/cloud-provider v0.30.3 // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
@@ -183,7 +183,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20201029203352-d40f9887b852 // indirect
 	github.com/vishvananda/netns v0.0.4 // indirect
@@ -227,19 +227,19 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.31.0 // indirect
-	k8s.io/apiserver v0.31.1 // indirect
-	k8s.io/component-base v0.31.2 // indirect
-	k8s.io/component-helpers v0.31.2 // indirect
-	k8s.io/controller-manager v0.31.1 // indirect
-	k8s.io/cri-api v0.31.1 // indirect
+	k8s.io/apiserver v0.31.6 // indirect
+	k8s.io/component-base v0.31.6 // indirect
+	k8s.io/component-helpers v0.31.6 // indirect
+	k8s.io/controller-manager v0.31.6 // indirect
+	k8s.io/cri-api v0.31.6 // indirect
 	k8s.io/cri-client v0.0.0 // indirect
 	k8s.io/csi-translation-lib v0.0.0 // indirect
 	k8s.io/dynamic-resource-allocation v0.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kms v0.31.1 // indirect
+	k8s.io/kms v0.31.6 // indirect
 	k8s.io/kube-openapi v0.0.0-20240903163716-9e1beecbcb38 // indirect
 	k8s.io/kube-scheduler v0.0.0 // indirect
-	k8s.io/kubelet v0.31.1 // indirect
+	k8s.io/kubelet v0.31.6 // indirect
 	k8s.io/mount-utils v0.30.2 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.30.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
@@ -251,23 +251,25 @@ require (
 )
 
 replace (
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5
 	// CVE GHSA-mh63-6h87-95cp
 	github.com/golang-jwt/jwt/v5 => github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/libopenstorage/secrets => github.com/rook/secrets v0.0.0-20240315053144-3195f6906937
+
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.14
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3 // required by rook
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful => go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
-	// CVE GHSA-v778-237x-gjrc
-	golang.org/x/crypto => golang.org/x/crypto v0.31.0
 	// CVE GHSA-qxp5-gwg8-xv66
 	golang.org/x/net => golang.org/x/net v0.36.0
-	k8s.io/client-go => k8s.io/client-go v0.31.1
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.31.1
-	k8s.io/cri-client => k8s.io/cri-client v0.31.1
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.31.1
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.31.1
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.1
-	k8s.io/mount-utils => k8s.io/mount-utils v0.31.1
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.1
+	golang.org/x/oauth2 => golang.org/x/oauth2 v0.27.0
+	k8s.io/client-go => k8s.io/client-go v0.31.6
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.31.6
+	k8s.io/cri-client => k8s.io/cri-client v0.31.6
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.31.6
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.31.6
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.6
+	k8s.io/mount-utils => k8s.io/mount-utils v0.31.6
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.6
 )
 
 exclude (
