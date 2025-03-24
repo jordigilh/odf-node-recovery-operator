@@ -207,7 +207,7 @@ require (
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
@@ -270,6 +270,8 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.6
 	k8s.io/mount-utils => k8s.io/mount-utils v0.31.6
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.6
+
+	sigs.k8s.io/sig-storage-local-static-provisioner => sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20250130044123-3e55e7a25121
 )
 
 exclude (
