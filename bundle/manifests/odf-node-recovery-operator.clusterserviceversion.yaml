@@ -23,13 +23,13 @@ metadata:
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
     containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
-    createdAt: "2025-03-24T22:19:32Z"
+    createdAt: "2025-03-25T03:03:21Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device or a node replaced
     operators.operatorframework.io/builder: operator-sdk-v1.39.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v0.0.5-rc1
+  name: odf-node-recovery-operator.v0.0.5-rc2
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -63,13 +63,23 @@ spec:
           - nodes
           verbs:
           - get
+          - list
           - update
+          - watch
         - apiGroups:
           - ""
           resources:
           - persistentvolumeclaims
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
           - persistentvolumes
           verbs:
+          - delete
           - get
           - list
           - watch
@@ -90,6 +100,12 @@ spec:
           verbs:
           - create
         - apiGroups:
+          - ""
+          resources:
+          - pods/log
+          verbs:
+          - get
+        - apiGroups:
           - apps
           resources:
           - deployments
@@ -107,6 +123,7 @@ spec:
           - delete
           - get
           - list
+          - watch
         - apiGroups:
           - config.openshift.io
           resources:
@@ -157,6 +174,8 @@ spec:
           - templates
           verbs:
           - get
+          - list
+          - watch
         - apiGroups:
           - authentication.k8s.io
           resources:
@@ -223,7 +242,7 @@ spec:
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.5-rc1
+                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.5-rc2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -311,4 +330,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 0.0.5-rc1
+  version: 0.0.5-rc2

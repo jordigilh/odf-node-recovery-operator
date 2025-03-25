@@ -54,16 +54,18 @@ type NodeRecoveryReconciler struct {
 
 // OCP
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
-//+kubebuilder:rbac:groups=template.openshift.io,resources=templates,verbs=get
+//+kubebuilder:rbac:groups=template.openshift.io,resources=templates,verbs=get;list;watch
 //+kubebuilder:rbac:groups=ocs.openshift.io,resources=storageclusters;ocsinitializations,verbs=get;update;watch;list
 
 //K8s
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;delete;watch;deletecollection
 //+kubebuilder:rbac:groups="",resources=pods/exec,verbs=create
+//+kubebuilder:rbac:groups="",resources=pods/log,verbs=get
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;update;watch
-//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;delete;list;create
-//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;update
-//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims;persistentvolumes,verbs=get;list;watch
+//+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;delete;list;create;watch
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;update;watch;list
+//+kubebuilder:rbac:groups="",resources=persistentvolumes,verbs=get;list;watch;delete
+//+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch
 
 // Events
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
