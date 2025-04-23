@@ -1,5 +1,5 @@
 ARG TARGETOS=linux
-ARG TARGETARCH=
+ARG TARGETARCH=amd64
 # Build the manager binary
 FROM --platform=linux/$TARGETARCH brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.23 as builder
 
