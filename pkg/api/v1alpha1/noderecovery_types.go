@@ -39,7 +39,6 @@ var (
 	WaitForPersistenVolumeBound    RecoveryConditionType = "WaitForPersistenVolumeBound"
 	RestartStorageOperator         RecoveryConditionType = "RestartStorageOperator"
 	DeleteFailedPodsNodeAffinity   RecoveryConditionType = "DeleteFailedPodsNodeAffinity"
-	ArchiveCephDaemonCrashMessages RecoveryConditionType = "ArchiveCephDaemonCrashMessages"
 	StorageClusterFitnessCheck     RecoveryConditionType = "StorageClusterFitnessCheck"
 	DisableCephTools               RecoveryConditionType = "DisableCephTools"
 

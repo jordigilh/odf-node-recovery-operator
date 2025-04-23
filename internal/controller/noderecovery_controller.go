@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
+	"github.com/jordigilh/odf-node-recovery-operator/monitoring"
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	"k8s.io/client-go/tools/record"
 )
@@ -108,6 +109,7 @@ func (r *NodeRecoveryReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		instance.Status.StartTime = &metav1.Time{Time: time.Now()}
 		instance.Status.Phase = odfv1alpha1.RunningPhase
 		instance.Status.Conditions = append(instance.Status.Conditions, odfv1alpha1.RecoveryCondition{Type: odfv1alpha1.EnableCephToolsPod, LastTransitionTime: metav1.Now(), Status: odfv1alpha1.StatusTrue})
+		monitoring.TotalOperandInstancesPrometheusCounter.Inc()
 	}
 	recoverer, err := newNodeRecoveryReconciler(ctx, log, r.Client, r.Config, r.Scheme, r.Recorder, r.CmdRunner, r.LogClient)
 	if err != nil {

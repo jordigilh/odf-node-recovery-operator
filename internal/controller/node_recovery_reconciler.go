@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/go-logr/logr"
 	version "github.com/hashicorp/go-version"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
+	"github.com/jordigilh/odf-node-recovery-operator/monitoring"
 	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	octemplateapi "github.com/openshift/api/template"
@@ -101,6 +103,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", reconciliationTimeout.Minutes()), "reason", latestCondition.Message)
 		instance.Status.Phase = odfv1alpha1.FailedPhase
 		r.recorder.Eventf(instance, "Error", "Reconciliation", fmt.Sprintf("failed to reconcile after retrying for 5 minutes: %s", latestCondition.Message))
+		monitoring.IncrementFailedOperandCounter(instance, latestCondition)
 		return ctrl.Result{}, nil
 	}
 	switch latestCondition.Type {
@@ -367,16 +370,6 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
-		transitionNextCondition(instance, odfv1alpha1.ArchiveCephDaemonCrashMessages)
-		return ctrl.Result{Requeue: true}, nil
-	case odfv1alpha1.ArchiveCephDaemonCrashMessages:
-		err := r.archiveCephDaemonCrashMessages()
-		if err != nil {
-			r.log.Error(err, "failed to archive ceph daemon crash messages")
-			latestCondition.Reason = odfv1alpha1.FailedArchiveCephDaemonCrashMessages
-			latestCondition.Message = err.Error()
-			return ctrl.Result{}, err
-		}
 		transitionNextCondition(instance, odfv1alpha1.StorageClusterFitnessCheck)
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.StorageClusterFitnessCheck:
@@ -389,6 +382,13 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		}
 		if status != HEALTH_OK {
 			latestCondition.Message = fmt.Sprintf("Waiting for cluster to become healthy: %s", status)
+			err := r.archiveCephDaemonCrashMessages()
+			if err != nil {
+				r.log.Error(err, "failed to archive ceph daemon crash messages")
+				latestCondition.Reason = odfv1alpha1.FailedArchiveCephDaemonCrashMessages
+				latestCondition.Message = err.Error()
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.DisableCephTools)
@@ -403,6 +403,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 				return ctrl.Result{}, err
 			}
 		}
+		monitoring.IncrementCompletedOperandCounter(instance)
 	}
 	instance.Status.Phase = odfv1alpha1.CompletedPhase
 	instance.Status.CompletionTime = &metav1.Time{Time: time.Now()}
@@ -432,6 +433,7 @@ func (r *NodeRecovery) handleCrashLoopBackOffPods(osdPods []v1.Pod) ([]odfv1alph
 			return nil, nil, ctrl.Result{}, err
 		}
 	}
+	slices.Sort(osdIDs)
 	return nodePV, osdIDs, ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 

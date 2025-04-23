@@ -1132,46 +1132,6 @@ var _ = Describe("NodeRecovery Controller", func() {
 			By("Validating the CR status")
 			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
 			Expect(err).NotTo(HaveOccurred())
-			validateConditions(nodeRecovery, 2, v1alpha1.ArchiveCephDaemonCrashMessages, "")
-		})
-
-		It("Validates the condition of archieving the ceph daemon crash messages", func() {
-			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ArchiveCephDaemonCrashMessages)
-
-			init := newOCSInit(enabledCephTools)
-
-			By("Creating a the ceph tools pod")
-
-			tools := &corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "storage-operator",
-					Namespace: "openshift-storage",
-					Labels: map[string]string{
-						"app": "rook-ceph-tools",
-					},
-				},
-			}
-
-			k8sClient = fakeClientBuilder.WithRuntimeObjects(init, nodeRecovery, tools).Build()
-			Expect(k8sClient).NotTo(BeNil())
-			controllerReconciler = &NodeRecoveryReconciler{
-				Client:    k8sClient,
-				Scheme:    k8sClient.Scheme(),
-				Config:    cfg,
-				Recorder:  record.NewFakeRecorder(2),
-				CmdRunner: newFakeRemoteExecutor("", "", nil),
-			}
-
-			By("Reconciling the CR")
-			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("Validating the response")
-			Expect(resp.Requeue).To(BeTrue())
-
-			By("Validating the CR status")
-			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
-			Expect(err).NotTo(HaveOccurred())
 			validateConditions(nodeRecovery, 2, v1alpha1.StorageClusterFitnessCheck, "")
 		})
 
