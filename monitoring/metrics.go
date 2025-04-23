@@ -11,15 +11,15 @@ import (
 
 var (
 	TotalOperandInstancesPrometheusCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "odf_node_recovery_total_operand_instances_counter",
+		Name: "odf_node_recovery_operand_instances_total",
 		Help: "ODF Node Recovery metric that keeps track of the total number of operand instances created",
 	})
 	CompletedOperandInstancesPrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "odf_node_recovery_success_operand_instances_counter",
+		Name: "odf_node_recovery_operand_instances_success",
 		Help: "ODF Node Recovery metric that keeps track of the total successful operand instances created",
 	}, []string{"osd_ids", "nodes"})
 	FailedOperandInstancesPrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "odf_node_recovery_failed_operand_instances_counter",
+		Name: "odf_node_recovery_operand_instances_failed",
 		Help: "ODF Node Recovery metric that keeps track of the total number of failed operand instances created, including the last state, the osd number(s) it was attempting to recover, and the hostnames sorted alphabetically",
 	}, []string{"osd_ids", "nodes", "last_condition"})
 
@@ -30,16 +30,22 @@ var (
 	}
 )
 
-func init() {
+// RegisterMetrics drops the existing registry and creates a new empty one. Then it proceeds
+// to add the metrics for the operator
+func RegisterMetrics() {
+	// Remove default metrics
+	metrics.Registry = prometheus.NewRegistry()
 	for _, metric := range metricsList {
 		metrics.Registry.MustRegister(metric)
 	}
 }
 
+// IncrementFailedOperandCounter adds a new metric to the failed operand counter metric
 func IncrementFailedOperandCounter(instance *v1alpha1.NodeRecovery, latestCondition *v1alpha1.RecoveryCondition) {
 	FailedOperandInstancesPrometheusCounter.With(prometheus.Labels{"osd_ids": strings.Join(instance.Status.CrashedOSDDeploymentIDs, ", "), "nodes": getFailingNodeNames(instance), "last_condition": string(latestCondition.Type)}).Inc()
 }
 
+// IncrementCompletedOperandCounter adds a new metric to the completed operand counter
 func IncrementCompletedOperandCounter(instance *v1alpha1.NodeRecovery) {
 	CompletedOperandInstancesPrometheusCounter.With(prometheus.Labels{"osd_ids": strings.Join(instance.Status.CrashedOSDDeploymentIDs, ", "), "nodes": getFailingNodeNames(instance)}).Inc()
 }
