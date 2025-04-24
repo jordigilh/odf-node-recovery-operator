@@ -5,11 +5,10 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
-    containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device or a node replaced
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v0.0.4
+  name: odf-node-recovery-operator.v1.0.1
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions: {}
@@ -49,4 +48,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 0.0.4
+  version: 1.0.1

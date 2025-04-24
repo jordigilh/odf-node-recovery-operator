@@ -23,13 +23,13 @@ metadata:
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
     containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
-    createdAt: "2025-03-25T03:03:21Z"
+    createdAt: "2025-04-23T18:29:16Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device or a node replaced
-    operators.operatorframework.io/builder: operator-sdk-v1.39.1
+    operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v0.0.5-rc2
+  name: odf-node-recovery-operator.v1.0.1-rc.1
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -214,35 +214,10 @@ spec:
             spec:
               containers:
               - args:
-                - --secure-listen-address=0.0.0.0:8443
-                - --upstream=http://127.0.0.1:8080/
-                - --logtostderr=true
-                - --v=0
-                image: registry.redhat.io/openshift4/ose-kube-rbac-proxy-rhel9@sha256:29201e85bd41642b72c7c0ce915e40aad90823d0efc3e7bbab9c351c92c74341
-                name: kube-rbac-proxy
-                ports:
-                - containerPort: 8443
-                  name: https
-                  protocol: TCP
-                resources:
-                  limits:
-                    cpu: 500m
-                    memory: 128Mi
-                  requests:
-                    cpu: 5m
-                    memory: 64Mi
-                securityContext:
-                  allowPrivilegeEscalation: false
-                  capabilities:
-                    drop:
-                    - ALL
-              - args:
-                - --health-probe-bind-address=:8081
-                - --metrics-bind-address=127.0.0.1:8080
                 - --leader-elect
                 command:
                 - /manager
-                image: quay.io/jordigilh/odf-node-recovery-controller:0.0.5-rc2
+                image: quay.io/jordigilh/odf-node-recovery-controller:1.0.1-rc.1
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -330,4 +305,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 0.0.5-rc2
+  version: 1.0.1-rc.1
