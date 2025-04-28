@@ -22,14 +22,13 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
-    containerImage: quay.io/jordigilh/odf-node-recovery-controller:0.0.1
-    createdAt: "2025-04-23T18:29:16Z"
+    createdAt: "2025-04-28T19:37:18Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and
       ODF cluster that has a device or a node replaced
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     repository: https://github.com/jordigilh/odf-node-recovery-operator
-  name: odf-node-recovery-operator.v1.0.1-rc.1
+  name: odf-node-recovery-operator.v1.1.0-rc.2
 spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
@@ -191,18 +190,15 @@ spec:
         serviceAccountName: odf-node-recovery-operator-controller-manager
       deployments:
       - label:
-          app.kubernetes.io/component: manager
-          app.kubernetes.io/created-by: odf-node-recovery-operator
-          app.kubernetes.io/instance: controller-manager
           app.kubernetes.io/managed-by: kustomize
-          app.kubernetes.io/name: deployment
-          app.kubernetes.io/part-of: odf-node-recovery-operator
+          app.kubernetes.io/name: odf-node-recovery-operator
           control-plane: controller-manager
         name: odf-node-recovery-operator-controller-manager
         spec:
           replicas: 1
           selector:
             matchLabels:
+              app.kubernetes.io/name: odf-node-recovery-operator
               control-plane: controller-manager
           strategy: {}
           template:
@@ -210,14 +206,18 @@ spec:
               annotations:
                 kubectl.kubernetes.io/default-container: manager
               labels:
+                app.kubernetes.io/name: odf-node-recovery-operator
                 control-plane: controller-manager
             spec:
               containers:
               - args:
+                - --metrics-bind-address=:8443
                 - --leader-elect
+                - --health-probe-bind-address=:8081
+                - --metrics-cert-path=/tmp/k8s-metrics-server/metrics-certs
                 command:
                 - /manager
-                image: quay.io/jordigilh/odf-node-recovery-controller:1.0.1-rc.1
+                image: quay.io/jordigilh/odf-node-recovery-controller:1.1.0-rc.2
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -243,10 +243,28 @@ spec:
                   capabilities:
                     drop:
                     - ALL
+                volumeMounts:
+                - mountPath: /tmp/k8s-metrics-server/metrics-certs
+                  name: metrics-certs
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
               serviceAccountName: odf-node-recovery-operator-controller-manager
               terminationGracePeriodSeconds: 10
+              volumes:
+              - name: metrics-certs
+                secret:
+                  items:
+                  - key: ca.crt
+                    path: ca.crt
+                  - key: tls.crt
+                    path: tls.crt
+                  - key: tls.key
+                    path: tls.key
+                  optional: false
+                  secretName: metrics-server-cert
       permissions:
       - rules:
         - apiGroups:
@@ -305,4 +323,4 @@ spec:
   provider:
     name: Red Hat, Inc.
     url: www.redhat.com
-  version: 1.0.1-rc.1
+  version: 1.1.0-rc.2
