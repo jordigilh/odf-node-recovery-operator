@@ -22,8 +22,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
-	"github.com/jordigilh/odf-node-recovery-operator/pkg/client/clientset/versioned/scheme"
+	"github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
+	"github.com/jordigilh/odf-node-recovery-operator/client/clientset/versioned/scheme"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 

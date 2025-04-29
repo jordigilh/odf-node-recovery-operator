@@ -38,10 +38,10 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	"github.com/jordigilh/odf-node-recovery-operator/monitoring"
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 
 	templatev1 "github.com/openshift/api/template/v1"
 	corev1 "k8s.io/api/core/v1"

@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
+	"github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/prometheus/client_golang/prometheus"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )

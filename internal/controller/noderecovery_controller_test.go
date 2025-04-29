@@ -20,7 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
+	"github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	templatev1 "github.com/openshift/api/template/v1"

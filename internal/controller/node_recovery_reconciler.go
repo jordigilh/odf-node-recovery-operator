@@ -30,9 +30,9 @@ import (
 
 	"github.com/go-logr/logr"
 	version "github.com/hashicorp/go-version"
+	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	"github.com/jordigilh/odf-node-recovery-operator/monitoring"
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	configv1 "github.com/openshift/api/config/v1"
 	octemplateapi "github.com/openshift/api/template"
 	templatev1 "github.com/openshift/api/template/v1"

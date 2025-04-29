@@ -32,9 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
 	"github.com/jordigilh/odf-node-recovery-operator/internal/controller/pod"
 	"github.com/jordigilh/odf-node-recovery-operator/monitoring"
-	odfv1alpha1 "github.com/jordigilh/odf-node-recovery-operator/pkg/api/v1alpha1"
 	"k8s.io/client-go/tools/record"
 )
 

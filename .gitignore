@@ -16,3 +16,4 @@ go.work
 go.work.sum
 bin/
 __debug*
+bundle/
