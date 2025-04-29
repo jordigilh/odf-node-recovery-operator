@@ -15,7 +15,7 @@ BUNDLE_CHANNELS := --channels=$(CHANNELS)
 endif
 
 USE_IMAGE_DIGESTS ?= --use-image-digests
-
+EXTRA_SERVICE_ACCOUNTS ?= --extra-service-accounts odf-node-recovery-operator-metrics-reader
 # DEFAULT_CHANNEL defines the default channel used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g DEFAULT_CHANNEL = "stable")
 # To re-generate a bundle for any other default channel without changing the default setup, you can:
@@ -24,7 +24,7 @@ USE_IMAGE_DIGESTS ?= --use-image-digests
 ifneq ($(origin DEFAULT_CHANNEL), undefined)
 BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
-BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL) $(USE_IMAGE_DIGESTS)
+BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL) $(USE_IMAGE_DIGESTS) $(EXTRA_SERVICE_ACCOUNTS)
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
