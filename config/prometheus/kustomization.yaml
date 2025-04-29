@@ -1,5 +1,8 @@
 resources:
 - monitor.yaml
+- metrics_reader_role.yaml
+- metrics_reader_role_binding.yaml
+- service-account.yaml
 
 # [PROMETHEUS-WITH-CERTS] The following patch configures the ServiceMonitor in ../prometheus
 # to securely reference certificates created and managed by cert-manager.

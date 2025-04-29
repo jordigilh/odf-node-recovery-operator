@@ -8,13 +8,15 @@ metadata:
   name: odf-node-recovery-operator-controller-manager-metrics-monitor
 spec:
   endpoints:
-  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  - authorization:
+      credentials:
+        key: token
+        name: metrics-reader
     path: /metrics
-    port: https
+    port: 8443
     scheme: https
     tlsConfig:
       insecureSkipVerify: true
-      serverName: odf-node-recovery-operator-controller-manager-metrics-service.odf-node-recovery-operator-system
   selector:
     matchLabels:
       app.kubernetes.io/name: odf-node-recovery-operator
