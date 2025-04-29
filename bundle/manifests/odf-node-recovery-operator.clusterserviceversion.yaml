@@ -22,7 +22,7 @@ metadata:
       ]
     capabilities: Basic Install
     categories: Storage,OpenShift Optional
-    createdAt: "2025-04-29T13:15:13Z"
+    createdAt: "2025-04-29T17:39:06Z"
     description: ODF Node Recovery is an operator that assist in the recovery of and ODF cluster that has a device or a node replaced
     operators.operatorframework.io/builder: operator-sdk-v1.39.2
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
@@ -32,7 +32,9 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-      - kind: NodeRecovery
+      - description: NodeRecovery is the Schema for the noderecoveries API
+        displayName: Node Recovery
+        kind: NodeRecovery
         name: noderecoveries.odf.openshift.io
         version: v1alpha1
   description: |
@@ -186,10 +188,6 @@ spec:
                 - subjectaccessreviews
               verbs:
                 - create
-            - nonResourceURLs:
-                - /metrics
-              verbs:
-                - get
           serviceAccountName: odf-node-recovery-operator-controller-manager
       deployments:
         - label:

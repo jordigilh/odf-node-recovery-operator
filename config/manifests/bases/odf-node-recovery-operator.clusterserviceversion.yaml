@@ -11,7 +11,13 @@ metadata:
   name: odf-node-recovery-operator.v1.0.1
 spec:
   apiservicedefinitions: {}
-  customresourcedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: NodeRecovery is the Schema for the noderecoveries API
+      displayName: Node Recovery
+      kind: NodeRecovery
+      name: noderecoveries.odf.openshift.io
+      version: v1alpha1
   description: |
     ODF Node Recovery is an operator that assist in the recovery of an
     ODF cluster in these 2 scenarios:
