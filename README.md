@@ -1,14 +1,16 @@
 # odf-node-recovery-operator
-// TODO(user): Add simple overview of use/purpose
-
+This operator implements 2 use cases for recovering an ODF cluster in a failing state:
+* Recovery via device failure by [replacing a device in a node](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.16/html-single/replacing_devices/index#preface-replacing-devices)
+* Recovery via node failure by [replacing a node](https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.14/html-single/replacing_nodes/index#replacing-an-operational-node-using-local-storage-devices_bm-upi-operational)
+ with a new one with the same name
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+This operator is available in the OpenShift community operators for OCP 4.14-4.18.
 
 ## Getting Started
 
 ### Prerequisites
-- go version v1.20.0+
-- docker version 17.03+.
+- go version v1.23.6+
+- podman version 5.4.2+.
 - kubectl version v1.11.3+.
 - Access to a Kubernetes v1.11.3+ cluster.
 
@@ -19,8 +21,8 @@
 make docker-build docker-push IMG=<some-registry>/odf-node-recovery-operator:tag
 ```
 
-**NOTE:** This image ought to be published in the personal registry you specified. 
-And it is required to have access to pull the image from the working environment. 
+**NOTE:** This image ought to be published in the personal registry you specified.
+And it is required to have access to pull the image from the working environment.
 Make sure you have the proper permission to the registry if the above commands don’t work.
 
 **Install the CRDs into the cluster:**
@@ -35,7 +37,7 @@ make install
 make deploy IMG=<some-registry>/odf-node-recovery-operator:tag
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin 
+> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
 privileges or be logged in as admin.
 
 **Create instances of your solution**
@@ -66,8 +68,16 @@ make uninstall
 make undeploy
 ```
 
+## Metrics
+
+The operator exposes the following prometheus metrics:
+* `odf_node_recovery_operand_instances_total_counter` is a counter that tracks the total number of operand instances created
+* `odf_node_recovery_completed_operand_instances_counter` is a counter that tracks the total number of operand instances that where successfully applied and recovered the ODF cluster
+* `odf_node_recovery_failed_operand_instances_counter` is a counter that tracks the total number of operand instances that failed in their attempt to recover the ODF cluster. It contains a label `last_condition` that exposes the latest recovery state it reached before timing out and failing.
+* `odf_node_recovery_success_for_node_counter` is a counter that tracks the total number of successfull attempts in which a node was recovered, with the node label `node` containing the name of the node. The counter does not discern between device or node replacement scenarios.
+* `odf_node_recovery_failed_for_node_counter` is a counter that tracks the total numbef of failed attempts in which a node was not recovered, with the node label `node` containing the name of the node. The counter does not discern between device or node replacement scenarios.
+
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
 

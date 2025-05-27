@@ -42,6 +42,7 @@ import (
 	"github.com/rook/rook/pkg/operator/ceph/cluster/osd"
 	"k8s.io/client-go/kubernetes"
 
+	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,7 +103,8 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", reconciliationTimeout.Minutes()), "reason", latestCondition.Message)
 		instance.Status.Phase = odfv1alpha1.FailedPhase
 		r.recorder.Eventf(instance, "Error", "Reconciliation", fmt.Sprintf("failed to reconcile after retrying for 5 minutes: %s", latestCondition.Message))
-		monitoring.IncrementFailedOperandCounter(instance, latestCondition)
+		monitoring.IncrementFailedNodeCounter(instance, latestCondition)
+		monitoring.FailedOperandInstancesPrometheusCounter.With(prometheus.Labels{"last_condition": string(latestCondition.Type)}).Inc()
 		return ctrl.Result{}, nil
 	}
 	switch latestCondition.Type {
@@ -414,6 +416,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	instance.Status.Phase = odfv1alpha1.CompletedPhase
 	instance.Status.CompletionTime = &metav1.Time{Time: time.Now()}
 	r.recorder.Eventf(instance, "Normal", "Reconciliation", "Successfully completed recovering cluster in %s", instance.Status.CompletionTime.Sub(instance.Status.StartTime.Time))
+	monitoring.CompletedOperandInstancesPrometheusCounter.Inc()
 	return ctrl.Result{}, nil
 }
 
