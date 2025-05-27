@@ -969,6 +969,66 @@ var _ = Describe("NodeRecovery Controller", func() {
 			validateConditions(nodeRecovery, 1, v1alpha1.WaitForPersistenVolumeBound, "")
 		})
 
+		It("Validates the condition of number of PVCs bound not matching expected number of PVCs (==operational OSD ids + failed OSD ids)", func() {
+			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{PersistentVolumeName: "pvName-foo", NodeName: "foo"}}
+			nodeRecovery.Status.OperationalOSDIDs = []string{"1"}
+			By("Creating the PV ")
+			pv := &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pvName",
+					Annotations: map[string]string{
+						localv1.PVDeviceNameLabel: "vdb",
+					},
+					Labels: map[string]string{
+						"kubernetes.io/hostname": "foo",
+					},
+				},
+				Status: corev1.PersistentVolumeStatus{
+					Phase: corev1.VolumeBound,
+				},
+			}
+
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pvcName",
+					Namespace: "openshift-storage",
+					Labels: map[string]string{
+						corev1.LabelHostname:               "foo",
+						"ceph.rook.io/cephImageAtCreation": ""},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "pvName",
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			}
+			pod := generateOSDPodObject("0")
+
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, pv, pvc, pod).Build()
+			Expect(k8sClient).NotTo(BeNil())
+			controllerReconciler = &NodeRecoveryReconciler{
+				Client:    k8sClient,
+				Scheme:    k8sClient.Scheme(),
+				Config:    cfg,
+				Recorder:  record.NewFakeRecorder(2),
+				CmdRunner: newFakeRemoteExecutor("", "", nil),
+			}
+
+			By("Reconciling the created resource")
+			resp, err := controllerReconciler.Reconcile(ctx, reconcile.Request{NamespacedName: typeNamespacedName})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Validating the response")
+			Expect(resp.RequeueAfter).To(Equal(15 * time.Second))
+
+			By("Validating the CR status")
+			err = k8sClient.Get(ctx, typeNamespacedName, nodeRecovery)
+			Expect(err).NotTo(HaveOccurred())
+			validateConditions(nodeRecovery, 1, v1alpha1.WaitForPersistenVolumeBound, "")
+		})
+
 		It("Validates the condition of PV bound after being released", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
 			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
