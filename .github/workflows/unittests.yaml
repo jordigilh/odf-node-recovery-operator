@@ -24,4 +24,4 @@ jobs:
       - name: Run Ginkgo tests with coverage
         id: ginkgo-tests
         run: |
-          go run github.com/onsi/ginkgo/v2/ginkgo -r --randomize-all --randomize-suites --fail-on-pending --keep-going --cover --coverprofile=coverage.out --coverpkg=./...
+          make test
