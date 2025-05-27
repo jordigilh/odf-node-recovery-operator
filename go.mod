@@ -245,6 +245,8 @@ require (
 replace (
 	github.com/containerd => github.com/containerd v1.5.7
 	github.com/containerd/containerd/api => github.com/containerd/containerd/api v1.7.19
+	github.com/containerd/log@ => github.com/containerd/log v0.1.0
+	github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.2.5
 	github.com/coreos/prometheus-operator => github.com/prometheus-operator/prometheus-operator v0.82.2
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5
 	// CVE GHSA-mh63-6h87-95cp
