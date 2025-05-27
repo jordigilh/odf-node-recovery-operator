@@ -34,9 +34,10 @@ require (
 	github.com/ceph/ceph-csi-operator/api v0.0.0-20241211130321-1c8ad98a7d6e // indirect
 	github.com/ceph/ceph-csi/api v0.0.0-20241216133622-88b7e0d6684f // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
-	github.com/containerd/containerd v1.5.7 // indirect
+	github.com/containerd/containerd/api v1.7.19 // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
+	github.com/containerd/ttrpc v1.2.5 // indirect
 	github.com/containernetworking/cni v1.2.3 // indirect
 	github.com/csi-addons/kubernetes-csi-addons v0.12.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
@@ -89,7 +90,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cilium/ebpf v0.9.1 // indirect
 	github.com/container-storage-interface/spec v1.11.0 // indirect
-	github.com/containerd/ttrpc v1.2.5 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd v0.0.0-20191104093116-d3cd4ed1dbcf // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -243,10 +243,6 @@ require (
 )
 
 replace (
-	github.com/containerd => github.com/containerd v1.5.7
-	github.com/containerd/containerd/api => github.com/containerd/containerd/api v1.7.19
-	github.com/containerd/log@ => github.com/containerd/log v0.1.0
-	github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.2.5
 	github.com/coreos/prometheus-operator => github.com/prometheus-operator/prometheus-operator v0.82.2
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5
 	// CVE GHSA-mh63-6h87-95cp
