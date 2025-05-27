@@ -467,7 +467,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ForceDeleteRookCephOSDPods)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "1"}}
 			By("Creating OSD pods and PV/PVCs in crashloopback status")
 			p1 := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -563,7 +563,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ForceDeleteRookCephOSDPods)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "1"}}
 
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
 			Expect(k8sClient).NotTo(BeNil())
@@ -594,7 +594,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "1"}}
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
@@ -631,7 +631,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.ProcessOCSRemovalTemplate)
 			nodeRecovery.Status.CrashLoopBackOffPods = true
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"1"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "1"}}
 			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, template).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
@@ -667,7 +667,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.CleanupOSDRemovalJob)
 			nodeRecovery.Status.Conditions[0].LastTransitionTime = metav1.Time{Time: time.Now().Add(-osdRemovalJobTimeout)}
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"0"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "0"}}
 			By("Creating the osd-removal-job pod in running phase")
 			p1 := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -709,7 +709,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 			template := newTemplate()
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.RetryForceCleanupOSDRemovalJob)
 			nodeRecovery.Status.Conditions[0].LastTransitionTime = metav1.Time{Time: time.Now().Add(-osdRemovalJobTimeout)}
-			nodeRecovery.Status.CrashedOSDDeploymentIDs = []string{"0"}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{FailingOSDID: "0"}}
 			By("Creating the osd-removal-job pod in running phase")
 			p1 := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -929,7 +929,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 
 		It("Validates the condition of deleting the failed PV", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
-			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
 			By("Creating the PV ")
 			pv := &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{
@@ -971,7 +971,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 
 		It("Validates the condition of PV bound after being released", func() {
 			nodeRecovery = getNodeRecoveryWithStatus(v1alpha1.WaitForPersistenVolumeBound)
-			nodeRecovery.Status.NodeDevice = []v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
+			nodeRecovery.Status.NodeDevice = []*v1alpha1.NodePV{{PersistentVolumeName: "pvName", NodeName: "foo"}}
 			By("Creating the PV ")
 			pv := &corev1.PersistentVolume{
 				ObjectMeta: metav1.ObjectMeta{

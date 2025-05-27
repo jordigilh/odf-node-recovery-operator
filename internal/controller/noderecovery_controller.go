@@ -132,6 +132,16 @@ func (r *NodeRecoveryReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return err
 	}
 
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &v1.PersistentVolumeClaim{}, pvcStatusPhaseFieldSelector, func(rawObj client.Object) []string {
+		obj, ok := rawObj.(*v1.PersistentVolumeClaim)
+		if !ok {
+			return nil
+		}
+		return []string{string(obj.Status.Phase)}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&odfv1alpha1.NodeRecovery{}, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		Owns(&odfv1alpha1.NodeRecovery{}).

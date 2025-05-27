@@ -121,11 +121,7 @@ type NodeRecoveryStatus struct {
 	CrashLoopBackOffPods bool `json:"crashLoopBackOffPods,omitempty"`
 
 	//NodeDevice contains a list of node name and device name pair used by the reconciliation to track which nodes and devices have failed based on the OSD pods that are in CrashLoopbackOff
-	NodeDevice []NodePV `json:"nodeDevice,omitempty"`
-
-	// CrashedOSDDeploymentIDs contains a list of the OSD IDs that match the ceph osd pods that are in CrashLoopbackOff status. This value is used during the reconciliation loop to cleanup the
-	// pods that are not being removed when the deployment is scaled down to 0
-	CrashedOSDDeploymentIDs []string `json:"osdIDs,omitempty"`
+	NodeDevice []*NodePV `json:"nodeDevice,omitempty"`
 
 	// ForcedOSDRemoval indicates if the reconciliation of the CR required to trigger the OSD Removal job with the ForcedOSDRemoval flag as true or false. If true it means the initial attempt to run the job timed out after 10 minutes
 	// and the reconciliation loop triggered a second job with the flag set to true to ensure success.
@@ -134,6 +130,13 @@ type NodeRecoveryStatus struct {
 	// KeepCephToolsPod indicates if the reconciliation shall delete the CephTools pod after completing the reconciliation flow. By default it will remove the pod unless it detects
 	// the pod exists prior to starting the reconciilation
 	KeepCephToolsPod bool `json:"keepCephToolsPod,omitempty"`
+
+	// OperationalOSDIDs contains the list of OSD IDs associated to pods in Running state. These IDs are used to filter out existing OSD IDs
+	// when determining if a failing OSD has been recovered in the form of a new OSD Pod with a new OSD ID.
+	// Since it is possible to have multiple OSD IDs associated to a node (see oc explain storagecluster.spec.storageDeviceSets.replica),
+	// waiting for a new OSD linked to a node is not enough, thus we have to keep track of existing and newly created OSD IDs when
+	// determining if a new OSD has been created to replace the failing one in a node.
+	OperationalOSDIDs []string `json:"operationalOSDIDs,omitempty"`
 }
 
 // NodeRecovery is the Schema for the noderecoveries API
@@ -167,8 +170,12 @@ type NodeRecoveryList struct {
 }
 
 type NodePV struct {
-	NodeName             string `json:"nodeName"`
+	// NodeName represents the name of the node associated to the OSD pod
+	NodeName string `json:"nodeName"`
+	// PersistentVolumeName represents the name of the persistent volume claimed by the OSD pod
 	PersistentVolumeName string `json:"pvName"`
+	// FailingOSDID contains the OSD ID found when starting the recovery associated with the failing pod
+	FailingOSDID string `json:"failingOSDID"`
 }
 
 func init() {

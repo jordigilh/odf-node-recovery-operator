@@ -133,11 +133,17 @@ func (in *NodeRecoveryStatus) DeepCopyInto(out *NodeRecoveryStatus) {
 	}
 	if in.NodeDevice != nil {
 		in, out := &in.NodeDevice, &out.NodeDevice
-		*out = make([]NodePV, len(*in))
-		copy(*out, *in)
+		*out = make([]*NodePV, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = new(NodePV)
+				**out = **in
+			}
+		}
 	}
-	if in.CrashedOSDDeploymentIDs != nil {
-		in, out := &in.CrashedOSDDeploymentIDs, &out.CrashedOSDDeploymentIDs
+	if in.OperationalOSDIDs != nil {
+		in, out := &in.OperationalOSDIDs, &out.OperationalOSDIDs
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

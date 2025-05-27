@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -184,19 +183,22 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.ManageCrashLoopBackOffPods:
 		// INITCRASHLOOKBACKOFF STATE PODS
-		osdPods, err := r.getOSDPodsInCrashLoopBackOff()
+		operational, failing, err := r.getOSDPodsInOperationalAndFailingStatus()
 		if err != nil {
-			r.log.Error(err, "failed to retrieve list of OSD specific pods in CrashLoopbackOff")
+			r.log.Error(err, "failed to retrieve list of OSD specific pods in a failed status (CrashLoopBackOff or Error)")
 			latestCondition.Reason = odfv1alpha1.FailedRetrieveCrashLoopBackOffPods
 			latestCondition.Message = err.Error()
 			return ctrl.Result{}, err
 		}
-		if len(osdPods) == 0 {
+		if len(failing) == 0 {
 			transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
 			return ctrl.Result{Requeue: true}, nil
 		}
+		if len(operational) > 0 {
+			instance.Status.OperationalOSDIDs = r.listOperationalOSDIDsFromPods(operational)
+		}
 		instance.Status.CrashLoopBackOffPods = true
-		nodeDevice, osdIDs, c, err := r.handleCrashLoopBackOffPods(osdPods)
+		nodeDevice, c, err := r.handleCrashLoopBackOffPods(failing)
 		if err != nil {
 			r.log.Error(err, "failed to handle pods in CrashLoopbackOff")
 			latestCondition.Reason = odfv1alpha1.FailedHandleCrashLoopBackOffPods
@@ -204,7 +206,6 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			return c, err
 		}
 		instance.Status.NodeDevice = nodeDevice
-		instance.Status.CrashedOSDDeploymentIDs = osdIDs
 		transitionNextCondition(instance, odfv1alpha1.ForceDeleteRookCephOSDPods)
 		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	case odfv1alpha1.ForceDeleteRookCephOSDPods:
@@ -213,7 +214,8 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			return ctrl.Result{Requeue: true}, nil
 		}
 		var c int
-		for _, id := range instance.Status.CrashedOSDDeploymentIDs {
+		ids := getOSDIDsFromNodeDevices(instance.Status.NodeDevice)
+		for _, id := range ids {
 			pods, err := r.getOSDPodsWithID(id)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -230,7 +232,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		}
 		if c > 0 {
 			// A total of 'c' pods have been in Terminating state for over a minute, force delete them and retry this phase
-			err := r.forceDeleteRookCephOSDPods(instance.Status.CrashedOSDDeploymentIDs)
+			err := r.forceDeleteRookCephOSDPods(ids)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -240,19 +242,16 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 		}
 		return ctrl.Result{Requeue: true}, nil
 	case odfv1alpha1.ProcessOCSRemovalTemplate:
-		found, err := r.deleteOldOSDRemovalJob()
+		err := r.deleteOldOSDRemovalJob()
 		if err != nil {
 			return ctrl.Result{}, err
-		}
-		if found {
-			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		osdPods, err := r.getOSDPods()
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		instance.Status.ForcedOSDRemoval = len(osdPods.Items) <= 3
-		err = r.processOCSOSDRemovalTemplate(instance.Status.CrashedOSDDeploymentIDs, instance.Status.ForcedOSDRemoval)
+		err = r.processOCSOSDRemovalTemplate(getOSDIDsFromNodeDevices(instance.Status.NodeDevice), instance.Status.ForcedOSDRemoval)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -272,15 +271,12 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			}
 			r.log.Error(fmt.Errorf("failed to reconcile after retrying for %.f minutes", osdRemovalJobTimeout.Minutes()), "timed out waiting for the OSD removal job to complete")
 			r.recorder.Eventf(instance, "Warning", "Reconciliation", fmt.Sprintf("OSD removal job timed out after %.f minutes. Retrying with %s=%t", osdRemovalJobTimeout.Minutes(), FORCE_OSD_REMOVAL, enableForcedOSDRemoval))
-			found, err := r.deleteOldOSDRemovalJob()
+			err := r.deleteOldOSDRemovalJob()
 			if err != nil {
 				r.log.Error(err, "failed to delete OSD removal jobs")
 				return ctrl.Result{}, err
 			}
-			if found {
-				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
-			}
-			err = r.processOCSOSDRemovalTemplate(instance.Status.CrashedOSDDeploymentIDs, enableForcedOSDRemoval)
+			err = r.processOCSOSDRemovalTemplate(getOSDIDsFromNodeDevices(instance.Status.NodeDevice), enableForcedOSDRemoval)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -293,7 +289,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.Phase = odfv1alpha1.FailedPhase
 			return ctrl.Result{}, err
 		}
-		_, err = r.deleteOldOSDRemovalJob()
+		err = r.deleteOldOSDRemovalJob()
 		if err != nil {
 			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
@@ -322,13 +318,10 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			instance.Status.Phase = odfv1alpha1.FailedPhase
 			return ctrl.Result{}, err
 		}
-		found, err := r.deleteOldOSDRemovalJob()
+		err = r.deleteOldOSDRemovalJob()
 		if err != nil {
 			r.log.Error(err, "failed to delete preexisting OSD removal jobs")
 			return ctrl.Result{}, err
-		}
-		if found {
-			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.WaitForPersistenVolumeBound)
 		return ctrl.Result{Requeue: true}, nil
@@ -340,12 +333,25 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			errs = errors.Join(r.processPVForNode(nd.NodeName, pvs.Items))
+			err = r.processPVForNode(nd, pvs.Items)
+			errs = errors.Join(errs, err)
 		}
 		if errs != nil {
 			latestCondition.Message = errs.Error()
 			// No need to return the error since the purpose is to requeue the event
 			// because the PVs are not yet reconciled.
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
+		expectedPVCs := len(instance.Status.OperationalOSDIDs) + len(instance.Status.NodeDevice)
+		pvcs, err := r.countPVCsBoundToODSPods()
+		if err != nil {
+			latestCondition.Message = err.Error()
+			// No need to return the error since the purpose is to requeue the event
+			// because the PVs are not yet reconciled.
+			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+		}
+		if pvcs >= expectedPVCs { // found >= expected in case there are new OSD deployments due to a previously failed clean job
+			latestCondition.Message = fmt.Sprintf("expected to find %d PVCs bound to OSD pods but found %d", expectedPVCs, pvcs)
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
 		transitionNextCondition(instance, odfv1alpha1.RestartStorageOperator)
@@ -411,30 +417,33 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 	return ctrl.Result{}, nil
 }
 
+// listOperationalOSDIDsFromPods
+func (r *NodeRecovery) listOperationalOSDIDsFromPods(osdPods []v1.Pod) []string {
+	ids := make([]string, 0, len(osdPods))
+	for _, p := range osdPods {
+		ids = append(ids, p.Labels["osd"])
+	}
+	return ids
+}
+
 // handleCrashLoopBackOffPods identifies the OSD pods that are in CrashLoopbackOff status. The function then proceeds to
 // scale the deployment of these pods to 0 replicas. The function returns a structure that contains the node name,
 // PV and the OSD id associated to these pods
-func (r *NodeRecovery) handleCrashLoopBackOffPods(osdPods []v1.Pod) ([]odfv1alpha1.NodePV, []string, reconcile.Result, error) {
-	nodePV := []odfv1alpha1.NodePV{}
-	osdIDs := []string{}
+func (r *NodeRecovery) handleCrashLoopBackOffPods(osdPods []v1.Pod) ([]*odfv1alpha1.NodePV, reconcile.Result, error) {
+	nodePV := []*odfv1alpha1.NodePV{}
 	for _, p := range osdPods {
 		nodeDevice, err := r.getNodeDeviceNameFromPV(&p)
 		if err != nil {
-			return nil, nil, ctrl.Result{}, err
+			return nil, ctrl.Result{}, err
 		}
-		nodePV = append(nodePV, *nodeDevice)
-		osdID, ok := p.Labels[osd.OsdIdLabelKey]
-		if !ok {
-			return nil, nil, ctrl.Result{}, fmt.Errorf("cannot determine OSD deployment object: missing label %s in pod %s/%s", p.Labels[osd.OsdIdLabelKey], p.Namespace, p.Name)
-		}
-		osdIDs = append(osdIDs, osdID)
-		err = r.scaleRookCephOSDDeploymentToZero(osdID)
+		nodePV = append(nodePV, nodeDevice)
+		err = r.scaleRookCephOSDDeploymentToZero(nodeDevice.FailingOSDID)
 		if err != nil {
-			return nil, nil, ctrl.Result{}, err
+			return nil, ctrl.Result{}, err
 		}
 	}
-	slices.Sort(osdIDs)
-	return nodePV, osdIDs, ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+	// slices.Sort(osdIDs)
+	return nodePV, ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 }
 
 // hasPodsInCreatingOrInitializingState checks for pods that are in the creating state or initializing and returns an error that contains all references to the pods
@@ -566,22 +575,32 @@ func (r *NodeRecovery) labelNodesWithPodsInPendingState(pods *v1.PodList) error 
 	return errs
 }
 
-// getOSDPodsInCrashLoopBackOff returns a list of OSD pods whose reason is CrashLoopbackOff. These
-// pods have a label that matches the `app=rook-ceph-osd` condition.
-func (r *NodeRecovery) getOSDPodsInCrashLoopBackOff() ([]v1.Pod, error) {
-	pods := []v1.Pod{}
+// getOSDPodsInOperationalAndFailingStatus returns a list of OSD pods that are operational (Running) and
+// whose reason is CrashLoopbackOff or Error. These pods have a label that matches the `app=rook-ceph-osd` condition.
+func (r *NodeRecovery) getOSDPodsInOperationalAndFailingStatus() ([]v1.Pod, []v1.Pod, error) {
+	operational, failing := []v1.Pod{}, []v1.Pod{}
 	l, err := r.getOSDPods()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, pod := range l.Items {
-		for _, status := range append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...) {
-			if status.State.Waiting != nil && (status.State.Waiting.Reason == podStateReasonCrashLoopBackOff) {
-				pods = append(pods, pod)
-			}
+		if isPodInCrashBackLoopOffOrErrorStatus(append(pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses...)) {
+			failing = append(failing, pod)
+		} else {
+			operational = append(operational, pod)
 		}
 	}
-	return pods, nil
+	return operational, failing, nil
+}
+
+func isPodInCrashBackLoopOffOrErrorStatus(statuses []v1.ContainerStatus) bool {
+	for _, status := range statuses {
+		if (status.State.Waiting != nil && (status.State.Waiting.Reason == podStateReasonCrashLoopBackOff)) ||
+			(status.State.Terminated != nil && status.State.Terminated.Reason == podStateReasonError) {
+			return true
+		}
+	}
+	return false
 }
 
 // getNodeDeviceNameFromPV returns a struct that contain the node and the PV used by the OSD pod
@@ -597,7 +616,7 @@ func (r *NodeRecovery) getNodeDeviceNameFromPV(pod *v1.Pod) (*odfv1alpha1.NodePV
 		if err != nil {
 			return nil, err
 		}
-		return &odfv1alpha1.NodePV{NodeName: pv.Labels[v1.LabelHostname], PersistentVolumeName: pv.Name}, nil
+		return &odfv1alpha1.NodePV{NodeName: pv.Labels[v1.LabelHostname], PersistentVolumeName: pv.Name, FailingOSDID: pod.Labels["osd"]}, nil
 	}
 	return nil, nil
 }
@@ -648,18 +667,29 @@ func (r *NodeRecovery) processOCSOSDRemovalTemplate(ids []string, forceOSDRemova
 	return nil
 }
 
-// getOSDRemovalPodCompletionStatus retrieves the OSD removal job pod
-func (r *NodeRecovery) getOSDRemovalPodJobCompletionStatus() (*v1.Pod, error) {
+func (r *NodeRecovery) listPodsWithSelectors(selectors map[string]string) (*v1.PodList, error) {
 	pods := &v1.PodList{}
-	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchExpressions: []metav1.LabelSelectorRequirement{
-			{Key: "job-name", Operator: metav1.LabelSelectorOpIn, Values: []string{"ocs-osd-removal-job"}},
-		}},
+	s := make([]metav1.LabelSelectorRequirement, 0, len(selectors))
+	for k, v := range selectors {
+		s = append(s,
+			metav1.LabelSelectorRequirement{Key: k, Operator: metav1.LabelSelectorOpIn, Values: []string{v}})
+	}
+	l, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchExpressions: s},
 	)
 	if err != nil {
 		return nil, err
 	}
-	err = r.List(r.ctx, pods, &client.ListOptions{LabelSelector: selector, Namespace: ODF_NAMESPACE})
+	err = r.List(r.ctx, pods, &client.ListOptions{LabelSelector: l, Namespace: ODF_NAMESPACE})
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve the list of pods that match the selected criteria %+v: %s", selectors, err)
+	}
+	return pods, nil
+}
+
+// getOSDRemovalPodCompletionStatus retrieves the OSD removal job pod
+func (r *NodeRecovery) getOSDRemovalPodJobCompletionStatus() (*v1.Pod, error) {
+	pods, err := r.listPodsWithSelectors(map[string]string{"job-name": "ocs-osd-removal-job"})
 	if err != nil {
 		return nil, err
 	}
@@ -729,29 +759,15 @@ func (r *NodeRecovery) getPVsForNode(nodeName string) (*v1.PersistentVolumeList,
 
 // processPVForNode examines the PV associated to the failed node and performs the following operations:
 // * Delete the PV if it's in Release phase
-// * Flag as error if the PV is not in Bound phase, since it is the desired state
-// * Flag as error if the PV is being Terminated
-// * Flag as error if no PV is found for the node
-func (r *NodeRecovery) processPVForNode(nodeName string, pvs []v1.PersistentVolume) error {
+func (r *NodeRecovery) processPVForNode(nd *odfv1alpha1.NodePV, pvs []v1.PersistentVolume) error {
 	var errs error
 	if len(pvs) == 0 {
-		errs = errors.Join(errs, fmt.Errorf("no PV found for host %s", nodeName))
+		errs = errors.Join(errs, fmt.Errorf("no PV found for host %s", nd.NodeName))
 	}
 	for _, pv := range pvs {
-		if pv.Status.Phase == v1.VolumeReleased {
-			msg := fmt.Sprintf("volume %s in node %s is released and about to be deleted", pv.Name, nodeName)
-			err := r.Delete(r.ctx, &pv, &client.DeleteOptions{})
-			if err != nil {
-				msg = msg + ": " + err.Error()
-			}
-			errs = errors.Join(errs, errors.New(msg))
-			continue
-		}
-		if pv.Status.Phase != v1.VolumeBound {
-			errs = errors.Join(errs, fmt.Errorf("volume %s in node %s expected to be bound but found in phase %s", pv.Name, nodeName, pv.Status.Phase))
-		}
-		if !pv.DeletionTimestamp.IsZero() {
-			errs = errors.Join(errs, fmt.Errorf("volume %s in node %s is being deleted", pv.Name, nodeName))
+		if pv.Name == nd.PersistentVolumeName && pv.Status.Phase == v1.VolumeReleased {
+			errs = errors.Join(errs, fmt.Errorf("volume %s in node %s is released and about to be deleted", pv.Name, nd.NodeName))
+			errs = errors.Join(errs, r.Delete(r.ctx, &pv, &client.DeleteOptions{}))
 		}
 	}
 	return errs
@@ -771,6 +787,37 @@ func (r *NodeRecovery) validateJobLogs(podName string) error {
 		return fmt.Errorf("osd job removal completed with failure: %s", slogs[len(slogs)-1])
 	}
 	return nil
+}
+
+func getOSDIDsFromNodeDevices(nodeDevice []*odfv1alpha1.NodePV) []string {
+	r := make([]string, 0, len(nodeDevice))
+	for _, nd := range nodeDevice {
+		r = append(r, nd.FailingOSDID)
+	}
+	return r
+}
+
+func (r *NodeRecovery) countPVCsBoundToODSPods() (int, error) {
+	l := v1.PersistentVolumeClaimList{}
+	err := r.List(r.ctx, &l, &client.ListOptions{Namespace: ODF_NAMESPACE}, &client.MatchingLabels{"ceph.rook.io/cephImageAtCreation": ""}, &client.MatchingFields{pvcStatusPhaseFieldSelector: string(v1.ClaimBound)})
+	if err != nil {
+		return 0, err
+	}
+	n := make([]string, 0, len(l.Items))
+	for _, pvc := range l.Items {
+		n = append(n, pvc.Name)
+	}
+	s := []metav1.LabelSelectorRequirement{{Key: osd.OSDOverPVCLabelKey, Operator: metav1.LabelSelectorOpIn, Values: n}}
+	ls, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"app": "rook-ceph-osd"}, MatchExpressions: s})
+	if err != nil {
+		return 0, err
+	}
+	pl := v1.PodList{}
+	err = r.List(r.ctx, &pl, &client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: ls})
+	if err != nil {
+		return 0, err
+	}
+	return len(pl.Items), nil
 }
 
 // getLatestCondition returns the latest condition

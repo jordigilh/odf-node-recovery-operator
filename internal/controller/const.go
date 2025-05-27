@@ -9,6 +9,7 @@ import (
 const (
 	ODF_NAMESPACE                  = "openshift-storage"
 	podStateReasonCrashLoopBackOff = "CrashLoopBackOff"
+	podStateReasonError            = "Error"
 	FAILED_OSD_IDS                 = "FAILED_OSD_IDS"
 	FORCE_OSD_REMOVAL              = "FORCE_OSD_REMOVAL"
 	HEALTH_OK                      = "HEALTH_OK"
@@ -20,6 +21,7 @@ const (
 	disableForcedOSDRemoval      = false
 	enableForcedOSDRemoval       = true
 	podStatusPhaseFieldSelector  = ".status.phase"
+	pvcStatusPhaseFieldSelector  = ".status.phase"
 	podDeletionTimestampSelector = ".metadata.deletionTimestamp"
 	osdJobSuccessMessage         = "completed removal"
 )

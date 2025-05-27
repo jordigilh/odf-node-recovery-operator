@@ -102,17 +102,32 @@ func (r *NodeRecovery) forceDeleteRookCephOSDPods(osdIDs []string) error {
 		})
 }
 
-// deleteOldOSDRemovalJob deletes any existing job named osd-removal-job in the openshift-storage
-func (r *NodeRecovery) deleteOldOSDRemovalJob() (bool, error) {
+// deleteOldOSDRemovalJob deletes any existing job named osd-removal-job in the openshift-storage and related pods
+func (r *NodeRecovery) deleteOldOSDRemovalJob() error {
 	job := &batchv1.Job{}
 	err := r.Get(r.ctx, types.NamespacedName{Namespace: ODF_NAMESPACE, Name: "ocs-osd-removal-job"}, job, &client.GetOptions{})
 	if err != nil {
-		if kerrors.IsNotFound(err) {
-			return false, nil
+		if !kerrors.IsNotFound(err) {
+			return err
 		}
-		return false, err
+	} else {
+		if err = r.Delete(r.ctx, job, &client.DeleteOptions{}); err != nil {
+			return err
+		}
 	}
-	return true, r.Delete(r.ctx, job, &client.DeleteOptions{})
+	sm := map[string]string{"job-name": "ocs-osd-removal-job"}
+	s, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: sm})
+	if err != nil {
+		return err
+	}
+	if err = r.DeleteAllOf(r.ctx, &v1.Pod{},
+		&client.DeleteAllOfOptions{
+			ListOptions:   client.ListOptions{Namespace: ODF_NAMESPACE, LabelSelector: s},
+			DeleteOptions: client.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))},
+		}); err != nil {
+		return err
+	}
+	return nil
 }
 
 // getRunningCephToolsPod returns the pod associated to the rook ceph tools instance
