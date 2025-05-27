@@ -69,7 +69,7 @@ var _ = Describe("NodeRecovery Controller", func() {
 
 		BeforeEach(func() {
 			By("configuring nodes and OSDInit")
-			fakeClientBuilder = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(version, os).WithStatusSubresource(&v1alpha1.NodeRecovery{}).WithIndex(&corev1.Pod{}, podStatusPhaseFieldSelector, filterByPhase)
+			fakeClientBuilder = fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(version, os).WithStatusSubresource(&v1alpha1.NodeRecovery{}).WithIndex(&corev1.Pod{}, podStatusPhaseFieldSelector, filterByPodPhase).WithIndex(&corev1.PersistentVolumeClaim{}, pvcStatusPhaseFieldSelector, filterByPVCPhase)
 		})
 		AfterEach(func() {
 
@@ -988,7 +988,24 @@ var _ = Describe("NodeRecovery Controller", func() {
 				},
 			}
 
-			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, pv).Build()
+			pvc := &corev1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "pvcName",
+					Namespace: "openshift-storage",
+					Labels: map[string]string{
+						corev1.LabelHostname:               "foo",
+						"ceph.rook.io/cephImageAtCreation": ""},
+				},
+				Spec: corev1.PersistentVolumeClaimSpec{
+					VolumeName: "pvName",
+				},
+				Status: corev1.PersistentVolumeClaimStatus{
+					Phase: corev1.ClaimBound,
+				},
+			}
+			pod := generateOSDPodObject("0")
+
+			k8sClient = fakeClientBuilder.WithRuntimeObjects(nodeRecovery, pv, pvc, pod).Build()
 			Expect(k8sClient).NotTo(BeNil())
 			controllerReconciler = &NodeRecoveryReconciler{
 				Client:    k8sClient,
@@ -1302,8 +1319,12 @@ func newOCPVersion(version string) *configv1.ClusterVersion {
 	}
 }
 
-func filterByPhase(obj client.Object) []string {
+func filterByPodPhase(obj client.Object) []string {
 	return []string{string(obj.(*corev1.Pod).Status.Phase)}
+}
+
+func filterByPVCPhase(obj client.Object) []string {
+	return []string{string(obj.(*corev1.PersistentVolumeClaim).Status.Phase)}
 }
 
 func newTemplate() *templatev1.Template {

@@ -350,7 +350,7 @@ func (r *NodeRecovery) Reconcile(instance *odfv1alpha1.NodeRecovery) (ctrl.Resul
 			// because the PVs are not yet reconciled.
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
-		if pvcs >= expectedPVCs { // found >= expected in case there are new OSD deployments due to a previously failed clean job
+		if pvcs < expectedPVCs { // found < expected
 			latestCondition.Message = fmt.Sprintf("expected to find %d PVCs bound to OSD pods but found %d", expectedPVCs, pvcs)
 			return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 		}
