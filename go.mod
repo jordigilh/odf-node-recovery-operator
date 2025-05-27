@@ -247,7 +247,7 @@ require (
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0 // indirect
 	sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20240328032358-4f81db77908f // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.1
+	sigs.k8s.io/structured-merge-diff/v4 v4.7.0
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
