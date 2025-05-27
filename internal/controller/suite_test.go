@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/jordigilh/odf-node-recovery-operator/api/v1alpha1"
-	"github.com/jordigilh/odf-node-recovery-operator/client/clientset/versioned/scheme"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -31,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
+	"k8s.io/kubectl/pkg/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
