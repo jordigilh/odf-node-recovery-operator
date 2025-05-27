@@ -7,23 +7,38 @@ import (
 )
 
 var (
+	// Operand
 	TotalOperandInstancesPrometheusCounter = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "odf_node_recovery_operand_instances_total",
+		Name: "odf_node_recovery_operand_instances_total_counter",
 		Help: "ODF Node Recovery metric that keeps track of the total number of operand instances created",
 	})
-	CompletedOperandInstancesPrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "odf_node_recovery_operand_instances_success",
-		Help: "ODF Node Recovery metric that keeps track of the total successful operand instances created",
-	}, []string{"node"})
+	CompletedOperandInstancesPrometheusCounter = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "odf_node_recovery_completed_operand_instances_counter",
+		Help: "ODF Node Recovery metric is a counter that tracks the total number of operand instances that completed successfully",
+	})
 	FailedOperandInstancesPrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "odf_node_recovery_operand_instances_failed",
-		Help: "ODF Node Recovery metric that keeps track of the total number of failed operand instances created, including the last state, the osd number(s) it was attempting to recover, and the hostnames sorted alphabetically",
-	}, []string{"node", "last_condition"})
+		Name: "odf_node_recovery_failed_operand_instances_counter",
+		Help: "ODF Node Recovery metric is a counter that tracks the total number of operands that failed to recover the ODF cluster and the last condition reached",
+	}, []string{"last_condition"})
+
+	// Node
+	SuccessRecoveryForNodePrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "odf_node_recovery_success_for_node_counter",
+		Help: "ODF Node Recovery metric is a counter that tracks the total successfully attempts to recover a given node",
+	}, []string{"node"})
+	FailedRecoveryForNodePrometheusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "odf_node_recovery_failed_for_node_counter",
+		Help: "ODF Node Recovery metric is a counter that tracks of the number of failed attemps to recover a given node",
+	}, []string{"node"})
 
 	metricsList = []prometheus.Collector{
+		// Operand
 		TotalOperandInstancesPrometheusCounter,
 		CompletedOperandInstancesPrometheusCounter,
 		FailedOperandInstancesPrometheusCounter,
+		// Node
+		SuccessRecoveryForNodePrometheusCounter,
+		FailedRecoveryForNodePrometheusCounter,
 	}
 )
 
@@ -37,16 +52,16 @@ func RegisterMetrics() {
 	}
 }
 
-// IncrementFailedOperandCounter adds a new metric to the failed operand counter metric
-func IncrementFailedOperandCounter(instance *v1alpha1.NodeRecovery, latestCondition *v1alpha1.RecoveryCondition) {
+// IncrementFailedNodeCounter adds a new metric to the failed node recovery counter metric
+func IncrementFailedNodeCounter(instance *v1alpha1.NodeRecovery, latestCondition *v1alpha1.RecoveryCondition) {
 	for _, nd := range instance.Status.NodeDevice {
-		FailedOperandInstancesPrometheusCounter.With(prometheus.Labels{"node": nd.NodeName, "last_condition": string(latestCondition.Type)}).Inc()
+		FailedRecoveryForNodePrometheusCounter.With(prometheus.Labels{"node": nd.NodeName}).Inc()
 	}
 }
 
-// IncrementCompletedOperandCounter adds a new metric to the completed operand counter
+// IncrementCompletedOperandCounter adds a new metric to the completed node recovery counter metric
 func IncrementCompletedOperandCounter(instance *v1alpha1.NodeRecovery) {
 	for _, nd := range instance.Status.NodeDevice {
-		CompletedOperandInstancesPrometheusCounter.With(prometheus.Labels{"node": nd.NodeName}).Inc()
+		SuccessRecoveryForNodePrometheusCounter.With(prometheus.Labels{"node": nd.NodeName}).Inc()
 	}
 }
