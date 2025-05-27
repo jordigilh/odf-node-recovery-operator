@@ -5,7 +5,7 @@ go 1.23.6
 require (
 	github.com/hashicorp/go-version v1.7.0
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/openshift/local-storage-operator v0.0.0-20240906102848-0008d0299d4c
 	github.com/red-hat-storage/ocs-operator v0.4.13
 	github.com/rook/rook v1.15.2
