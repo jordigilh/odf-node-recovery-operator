@@ -65,6 +65,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sykesm/zap-logfmt v0.0.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	k8s.io/cli-runtime v0.32.5 // indirect
 	k8s.io/cloud-provider v0.32.3 // indirect
@@ -185,7 +186,6 @@ require (
 	go.etcd.io/etcd/api/v3 v3.5.16 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.16 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.16 // indirect
-	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.42.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel v1.32.0 // indirect
@@ -238,7 +238,7 @@ require (
 	sigs.k8s.io/mcs-api v0.1.0 // indirect
 	sigs.k8s.io/sig-storage-lib-external-provisioner/v6 v6.3.0 // indirect
 	sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20240328032358-4f81db77908f // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.7.0
+	sigs.k8s.io/structured-merge-diff/v4 v4.7.0 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
@@ -251,8 +251,6 @@ replace (
 
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.1.14
 	github.com/portworx/sched-ops => github.com/portworx/sched-ops v0.20.4-openstorage-rc3 // required by rook
-	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful => go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.44.0
-	// CVE GHSA-qxp5-gwg8-xv66
 	golang.org/x/net => golang.org/x/net v0.38.0
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.27.0
 	k8s.io/client-go => k8s.io/client-go v0.32.5
@@ -269,13 +267,4 @@ replace (
 exclude (
 	// This tag doesn't exist, but is imported by github.com/portworx/sched-ops.
 	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
-// // Exclude the v3.9 tags, because these are very old
-// // but are picked when updating dependencies.
-// github.com/openshift/api v3.9.0+incompatible
-// github.com/openshift/api v3.9.1-0.20190924102528-32369d4db2ad+incompatible
-
-// // Exclude pre-go-mod kubernetes tags, because they are older
-// // than v0.x releases but are picked when updating dependencies.
-// k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-// k8s.io/client-go v12.0.0+incompatible
 )
