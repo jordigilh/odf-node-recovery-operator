@@ -26,3 +26,12 @@ jobs:
     - name: Run unit tests
       run: |
         make test
+
+  generate:
+    name: Generate manifests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Generate manifests
+      run: |
+        make generate
