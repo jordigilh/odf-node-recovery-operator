@@ -109,7 +109,7 @@ require (
 	github.com/gemalto/flume v0.13.1 // indirect
 	github.com/gemalto/kmip-go v0.0.10 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -264,7 +264,5 @@ replace (
 	sigs.k8s.io/sig-storage-local-static-provisioner => sigs.k8s.io/sig-storage-local-static-provisioner v0.0.0-20250130044123-3e55e7a25121
 )
 
-exclude (
-	// This tag doesn't exist, but is imported by github.com/portworx/sched-ops.
-	github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
-)
+// This tag doesn't exist, but is imported by github.com/portworx/sched-ops.
+exclude github.com/kubernetes-incubator/external-storage v0.20.4-openstorage-rc2
