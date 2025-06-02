@@ -1,6 +1,6 @@
 module github.com/jordigilh/odf-node-recovery-operator
 
-go 1.23.6
+go 1.24.0
 
 require (
 	github.com/hashicorp/go-version v1.7.0
@@ -10,8 +10,8 @@ require (
 	github.com/openshift/local-storage-operator v0.0.0-20240906102848-0008d0299d4c
 	github.com/red-hat-storage/ocs-operator v0.4.13
 	github.com/rook/rook v1.17.3
-	k8s.io/api v0.32.5
-	k8s.io/apimachinery v0.32.5
+	k8s.io/api v0.33.1
+	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kubectl v0.32.5
 	k8s.io/kubernetes v1.32.5
@@ -71,6 +71,7 @@ require (
 	k8s.io/cloud-provider v0.32.3 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect
+	sigs.k8s.io/randfill v1.0.0 // indirect
 )
 
 require (
@@ -122,7 +123,6 @@ require (
 	github.com/google/cel-go v0.22.0 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
@@ -229,7 +229,7 @@ require (
 	k8s.io/dynamic-resource-allocation v0.0.0 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kms v0.32.5 // indirect
-	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
+	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/kube-scheduler v0.0.0 // indirect
 	k8s.io/kubelet v0.32.5 // indirect
 	k8s.io/mount-utils v0.30.2 // indirect
