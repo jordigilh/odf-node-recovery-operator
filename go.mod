@@ -109,7 +109,7 @@ require (
 	github.com/gemalto/flume v0.13.1 // indirect
 	github.com/gemalto/kmip-go v0.0.10 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
