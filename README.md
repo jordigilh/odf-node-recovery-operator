@@ -77,6 +77,109 @@ The operator exposes the following prometheus metrics:
 * `odf_node_recovery_success_for_node_counter` is a counter that tracks the total number of successfull attempts in which a node was recovered, with the node label `node` containing the name of the node. The counter does not discern between device or node replacement scenarios.
 * `odf_node_recovery_failed_for_node_counter` is a counter that tracks the total numbef of failed attempts in which a node was not recovered, with the node label `node` containing the name of the node. The counter does not discern between device or node replacement scenarios.
 
+## Releasing to community operators
+Follow these steps to release a new version in the community-operators repository:
+* Update version in Makefile, for instance `v1.1.1`
+* Run `make docker-build docker-push` to create and release a new image to the quay.io repository
+* Run `make bundle` to generate the `bundle/` files.
+* In the [community-operators-prod](https://github.com/redhat-openshift-ecosystem/community-operators-prod.git) repository, create a new directory in `operators/odf-node-recovery-operator/` that matches the new version and copy the contents of the `bundle/` directory in it:
+
+```
+$> tree operators/odf-node-recovery-operator
+operators/odf-node-recovery-operator
+├── 0.0.1
+│   ├── manifests
+│   │   ├── odf-node-recovery-operator-controller-manager-metrics-service_v1_service.yaml
+|   |   |   ....
+│   ├── metadata
+│   │   └── annotations.yaml
+│   └── tests
+│       └── scorecard
+│           └── config.yaml
+├── 0.0.2
+│   ├── manifests
+│   │   ├── odf-node-recovery-operator-controller-manager-metrics-monitor_monitoring.coreos.com_v1_servicemonitor.yaml
+|   |   |   ....
+│   ├── metadata
+│   │   └── annotations.yaml
+│   └── tests
+│       └── scorecard
+│           └── config.yaml
+├── 1.0.0
+│   ├── manifests
+│   │   ├── odf-node-recovery-operator-controller-manager-metrics-monitor_monitoring.coreos.com_v1_servicemonitor.yaml
+|   |   |   ....
+│   ├── metadata
+│   │   └── annotations.yaml
+│   └── tests
+│       └── scorecard
+│           └── config.yaml
+├── 1.1.0
+│   ├── manifests
+│   │   ├── odf-node-recovery-operator-controller-manager-metrics-monitor_monitoring.coreos.com_v1_servicemonitor.yaml
+|   |   |   ....
+│   ├── metadata
+│   │   └── annotations.yaml
+│   └── tests
+│       └── scorecard
+│           └── config.yaml
+```
+
+Create the new directory for 1.1.1:
+
+```
+mkdir operators/odf-node-recovery-operator/1.1.1
+```
+And copy the contents of the `bundle/` directory in this repo to the newly created directory in `community-operators-prod`. You should have
+something like this:
+```
+$> tree operators/odf-node-recovery-operator
+operators/odf-node-recovery-operator
+├── 0.0.1
+|   ....
+├── 0.0.2
+|   ....
+├── 1.0.0
+|   ....
+├── 1.1.0
+|   ....
+├── 1.1.1
+│   ├── manifests
+│   │   ├── odf-node-recovery-operator-controller-manager-metrics-monitor_monitoring.coreos.com_v1_servicemonitor.yaml
+|   |   |   ....
+│   ├── metadata
+│   │   └── annotations.yaml
+│   └── tests
+│       └── scorecard
+│           └── config.yaml
+```
+
+* Create a PR in the `community-operators-prod` with the newly created structure. The PR triggers a job that creates the bundle container image and pushes it to a location in `quay.io`. Once completed, it will add an [entry](https://github.com/redhat-openshift-ecosystem/community-operators-prod/pull/6748#issuecomment-2932916521) in the PR with the image pullspec.
+
+* Create a new branch in the `community-operators-prod` to update the catalogs. Update the [operators/odf-node-recovery-operator/catalog-templates/basic.yaml](https://github.com/redhat-openshift-ecosystem/community-operators-prod/blob/main/operators/odf-node-recovery-operator/catalog-templates/basic.yaml) file to include the new bundle image pullspec and also to describe the upgrade path.
+
+* Run the `make catalogs` in `operators/odf-node-recovery-operator/`. The outcome should update all entries in the `catalogs/<OCP version>/odf-node-recovery-operator/catalog.yaml` files to include the new bundle pullspec and the upgrade path as defined in the `basic.yaml` file.
+
+```
+$> make catalogs
+if [ ! -d /Users/jgil/go/src/github.com/odf/community-operators-prod/bin ]; then mkdir -p /Users/jgil/go/src/github.com/odf/community-operators-prod/bin; fi
+curl -sLO https://raw.githubusercontent.com/redhat-openshift-ecosystem/operator-pipelines/main/fbc/render_catalogs.sh
+mv render_catalogs.sh /Users/jgil/go/src/github.com/odf/community-operators-prod/bin/render_catalogs.sh
+chmod +x /Users/jgil/go/src/github.com/odf/community-operators-prod/bin/render_catalogs.sh
+Cleaning up the operator catalogs from /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs
+Rendering catalogs from templates
+- Processing template: basic.yaml (Type: olm.template.basic)
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.12/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.13/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.14/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.15/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.16/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.17/odf-node-recovery-operator/catalog.yaml
+ ✅ Rendered → /Users/jgil/go/src/github.com/odf/community-operators-prod/catalogs/v4.18/odf-node-recovery-operator/catalog.yaml
+ ```
+
+* Create a PR with the changes. Once merged, the new version should be available within a few hours, depending on when the bespoke OCP cluster updates its catalog.
+
 ## Contributing
 
 **NOTE:** Run `make help` for more information on all potential `make` targets
