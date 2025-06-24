@@ -14,7 +14,7 @@ require (
 	k8s.io/apimachinery v0.32.5
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/kubectl v0.32.5
-	k8s.io/kubernetes v1.32.5
+	k8s.io/kubernetes v1.32.6
 	k8s.io/pod-security-admission v0.33.1
 	k8s.io/utils v0.0.0-20241210054802-24370beab758
 	sigs.k8s.io/controller-runtime v0.20.4
@@ -30,7 +30,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.2 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
-	github.com/Microsoft/hnslib v0.0.8 // indirect
+	github.com/Microsoft/hnslib v0.1.1 // indirect
 	github.com/ceph/ceph-csi-operator/api v0.0.0-20241211130321-1c8ad98a7d6e // indirect
 	github.com/ceph/ceph-csi/api v0.0.0-20241216133622-88b7e0d6684f // indirect
 	github.com/chai2010/gettext-go v1.0.2 // indirect
